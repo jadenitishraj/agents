@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Multi-Agent Research System — ask a question and get a well-researched answer.">
+    <title>Multi-Agent Research System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-glow"></div>
+            <h1>Multi-Agent Research</h1>
+            <p class="subtitle">Ask a question. Agents collaborate. Get answers.</p>
+        </header>
+
+        <!-- Input Section -->
+        <section class="input-section">
+            <div class="input-wrapper">
+                <input
+                    type="text"
+                    id="question-input"
+                    placeholder="e.g. What are the tax implications of converting a 401k to a Roth IRA?"
+                    autocomplete="off"
+                >
+                <button id="submit-btn" onclick="submitQuestion()">
+                    <span class="btn-text">Research</span>
+                    <span class="btn-loader" style="display:none;"></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Team Display -->
+        <section class="team-section" id="team-section" style="display:none;">
+            <h2>Selected Team</h2>
+            <div class="team-badges" id="team-badges"></div>
+        </section>
+
+        <!-- Error Display -->
+        <section class="error-section" id="error-section" style="display:none;">
+            <div class="error-card">
+                <p id="error-message"></p>
+            </div>
+        </section>
+
+        <!-- Final Answer -->
+        <section class="answer-section" id="answer-section" style="display:none;">
+            <h2>Final Answer</h2>
+            <div class="answer-card" id="final-answer"></div>
+            <div class="run-summary" id="run-summary"></div>
+        </section>
+    </div>
+
+    <script src="/static/index.js"></script>
+</body>
+</html>
