@@ -17,6 +17,6 @@ def planner_agent(question: str) -> list[str]:
 Return ONLY the queries, one per line, no numbering or extra text.
 
 Question: {question}"""
-    text = call_llm(prompt, max_tokens=200)
+    text = call_llm(prompt, max_tokens=200, agent_name="Planner")
     queries = [line.strip() for line in text.splitlines() if line.strip()]
     return queries[:5]

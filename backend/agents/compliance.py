@@ -18,4 +18,4 @@ def compliance_agent(question: str) -> str:
 Write ONE sentence disclaimer the answer should include.
 
 Question: {question}"""
-    return call_llm(prompt, max_tokens=100)
+    return call_llm(prompt, max_tokens=100, agent_name="Compliance")

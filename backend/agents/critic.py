@@ -37,7 +37,7 @@ Reply with EXACTLY one of:
 Question: {question}
 
 Answer: {answer}"""
-    verdict = call_llm(prompt, max_tokens=80)
+    verdict = call_llm(prompt, max_tokens=80, agent_name="Critic")
     if verdict.upper().startswith("REJECT"):
         reason = verdict.split(":", 1)[1].strip() if ":" in verdict else "Incomplete"
         issues.append(f"Aspect check failed: {reason}")

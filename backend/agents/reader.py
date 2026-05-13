@@ -26,5 +26,5 @@ Question: {question}
 
 Sources:
 {snippets}"""
-    text = call_llm(prompt, max_tokens=600)
+    text = call_llm(prompt, max_tokens=600, agent_name="Reader")
     return [line.strip() for line in text.splitlines() if line.strip()]

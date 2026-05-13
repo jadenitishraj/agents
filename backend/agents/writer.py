@@ -46,4 +46,4 @@ Facts:
 
 Sources:
 {sources_text}{feedback_text}"""
-    return call_llm(prompt, max_tokens=600)
+    return call_llm(prompt, max_tokens=600, agent_name="Writer")
