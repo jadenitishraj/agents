@@ -6,6 +6,8 @@ Tavily, SerpAPI, or Brave Search, change only this file.
 
 from __future__ import annotations
 
+from langsmith import traceable
+
 from langchain_community.tools import DuckDuckGoSearchResults
 
 
@@ -15,6 +17,7 @@ _search_tool = DuckDuckGoSearchResults(
 )
 
 
+@traceable(name="search_web", run_type="tool")
 def search_web(query: str) -> list[dict]:
     """Run a single search query and return a list of result dicts.
 

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from langsmith import traceable
+
 
 @dataclass
 class Reflection:
@@ -23,6 +25,7 @@ class Reflection:
     lesson_learned: str
 
 
+@traceable(name="reflector_agent", run_type="chain")
 def reflector_agent(
     question: str,
     draft: str,

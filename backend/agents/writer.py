@@ -5,11 +5,14 @@ Accepts optional critic feedback (or Reflexion lessons) to improve rewrites.
 
 from __future__ import annotations
 
+from langsmith import traceable
+
 from backend.llm import call_llm
 
 Source = dict[str, str]
 
 
+@traceable(name="writer_agent", run_type="chain")
 def writer_agent(
     question: str,
     sources: list[Source],

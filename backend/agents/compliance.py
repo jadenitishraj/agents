@@ -6,9 +6,12 @@ touches medical, legal, financial, or similar high-stakes areas.
 
 from __future__ import annotations
 
+from langsmith import traceable
+
 from backend.llm import call_llm
 
 
+@traceable(name="compliance_agent", run_type="chain")
 def compliance_agent(question: str) -> str:
     """Generate a one-sentence disclaimer for a sensitive-domain question."""
     prompt = f"""This question is in a sensitive domain (medical/legal/financial).

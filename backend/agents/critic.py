@@ -6,11 +6,14 @@ and asks the LLM whether the answer actually addresses the question.
 
 from __future__ import annotations
 
+from langsmith import traceable
+
 from backend.llm import call_llm
 
 Source = dict[str, str]
 
 
+@traceable(name="critic_agent", run_type="chain")
 def critic_agent(
     question: str,
     answer: str,

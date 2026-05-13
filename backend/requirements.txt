@@ -6,3 +6,4 @@ fastapi>=0.115.0
 uvicorn>=0.30.0
 python-dotenv>=1.0.0
 ddgs>=9.0.0
+langsmith>=0.3.0

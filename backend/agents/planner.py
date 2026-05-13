@@ -5,9 +5,12 @@ Pure function: question in, list of queries out.
 
 from __future__ import annotations
 
+from langsmith import traceable
+
 from backend.llm import call_llm
 
 
+@traceable(name="planner_agent", run_type="chain")
 def planner_agent(question: str) -> list[str]:
     """Break a research question into 3-5 specific web search queries."""
     prompt = f"""Break this research question into 3 to 5 specific web search queries.

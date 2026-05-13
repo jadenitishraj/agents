@@ -6,6 +6,9 @@ No streaming, no SSE, no approve endpoint.
 
 from __future__ import annotations
 
+from dotenv import load_dotenv
+load_dotenv()  # Load .env BEFORE any LangChain/LangSmith imports
+
 import time
 from pathlib import Path
 
@@ -57,7 +60,16 @@ async def research(req: ResearchRequest):
     print(f"Starting pipeline...\n")
 
     start_time = time.time()
-    final_state = graph.invoke(initial_state, config={"recursion_limit": 50})
+    final_state = graph.invoke(
+        initial_state,
+        config={
+            "recursion_limit": 50,
+            "metadata": {
+                "question": req.question,
+                "team": team,
+            },
+        },
+    )
     final_state["duration_seconds"] = time.time() - start_time
     final_state["final_answer"] = final_state.get("answer", "")
 

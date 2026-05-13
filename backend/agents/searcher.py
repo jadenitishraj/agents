@@ -6,11 +6,14 @@ what to search; the tool does the actual retrieval.
 
 from __future__ import annotations
 
+from langsmith import traceable
+
 from backend.tools.search import search_web
 
 Source = dict[str, str]
 
 
+@traceable(name="searcher_agent", run_type="chain")
 def searcher_agent(queries: list[str]) -> list[Source]:
     """Search the web for each query and return deduplicated sources.
 
