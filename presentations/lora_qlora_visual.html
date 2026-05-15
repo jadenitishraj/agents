@@ -1,0 +1,2209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fine-Tuning Gemma · LoRA + QLoRA · A Visual Lesson</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: #0a0a14;
+  --bg-2: #11111f;
+  --ink: #f4f1ea;
+  --ink-dim: #a8a3b8;
+  --ink-faint: #5a5670;
+
+  /* Tensor / dimension colors */
+  --dim-B: #14b8a6;
+  --dim-T: #a78bfa;
+  --dim-C: #fb923c;
+  --dim-V: #f472b6;
+  --dim-H: #facc15;
+  --dim-R: #34d399;     /* rank — green for LoRA */
+
+  /* Gradient stops (top → bottom) */
+  --s1:  #4338ca;
+  --s2:  #6d28d9;
+  --s3:  #9333ea;
+  --s4:  #c026d3;
+  --s5:  #db2777;
+  --s6:  #e11d48;
+  --s7:  #ea580c;
+  --s8:  #f59e0b;
+
+  /* Code panel accent — distinct from warm gradient */
+  --code-accent: #10b981;
+  --code-bg: #07121a;
+  --code-border: rgba(16,185,129,0.25);
+
+  --pos: #ef4444;
+  --neg: #3b82f6;
+
+  --card-bg: rgba(255,255,255,0.03);
+  --card-border: rgba(255,255,255,0.08);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family: 'Inter Tight', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.6;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse at top, rgba(67,56,202,0.18), transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(234,88,12,0.10), transparent 50%);
+  background-attachment: fixed;
+}
+
+body::before{
+  content:'';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+.container{
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 32px;
+  position: relative;
+  z-index: 2;
+}
+
+/* === Typography === */
+.display{
+  font-family: 'Fraunces', serif;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+.serif{ font-family: 'Fraunces', serif; }
+.mono{ font-family: 'JetBrains Mono', monospace; }
+.label{
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+/* === Hero === */
+.hero{
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 80px 0 60px;
+  position: relative;
+}
+.hero .stage-num{
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 14px;
+  color: var(--ink-faint);
+  margin-bottom: 24px;
+}
+.hero h1{
+  font-size: clamp(48px, 9vw, 124px);
+  margin-bottom: 32px;
+  background: linear-gradient(135deg, var(--s1) 0%, var(--s4) 50%, var(--s7) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero h1 em{
+  font-style: italic;
+  font-weight: 300;
+  background: none;
+  -webkit-text-fill-color: var(--ink);
+  color: var(--ink);
+}
+.hero .sub{
+  font-size: clamp(18px, 2.2vw, 24px);
+  max-width: 740px;
+  color: var(--ink-dim);
+  margin-bottom: 56px;
+  font-weight: 300;
+}
+.stats{
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  max-width: 980px;
+}
+.stat{
+  border-left: 2px solid var(--card-border);
+  padding-left: 16px;
+}
+.stat .num{
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 36px;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.stat .label{ margin-top: 4px; }
+.scroll-hint{
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  animation: bob 2s ease-in-out infinite;
+}
+@keyframes bob{
+  0%,100%{ transform: translate(-50%, 0); }
+  50%{ transform: translate(-50%, 8px); }
+}
+
+/* === Stage Wrapper === */
+.stage{
+  padding: 100px 0;
+  position: relative;
+  border-top: 1px solid var(--card-border);
+}
+.stage-header{
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 24px;
+  margin-bottom: 56px;
+  align-items: start;
+}
+.stage-num-big{
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 64px;
+  line-height: 1;
+  background: var(--stage-color, var(--s1));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.stage-title{
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: clamp(32px, 5vw, 56px);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin-bottom: 12px;
+}
+.stage-kicker{
+  font-size: 17px;
+  color: var(--ink-dim);
+  font-weight: 300;
+  max-width: 780px;
+}
+
+/* === Card === */
+.card{
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 32px;
+  position: relative;
+  backdrop-filter: blur(10px);
+}
+.card.accent{
+  border-left: 3px solid var(--stage-color, var(--s1));
+}
+
+/* === Code reveal === */
+.code-toggle{
+  margin-top: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: rgba(16,185,129,0.08);
+  border: 1px solid var(--code-border);
+  color: var(--code-accent);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 600;
+}
+.code-toggle:hover{
+  background: rgba(16,185,129,0.15);
+  border-color: var(--code-accent);
+}
+.code-toggle .icon{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+.code-panel{
+  margin-top: 16px;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: none;
+  position: relative;
+}
+.code-panel.open{ display: block; animation: slideDown 0.3s ease; }
+@keyframes slideDown{
+  from{ opacity: 0; transform: translateY(-8px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+.code-panel-header{
+  padding: 10px 18px;
+  background: rgba(16,185,129,0.05);
+  border-bottom: 1px solid var(--code-border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--code-accent);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.code-panel-header .filename::before{
+  content: '◉';
+  margin-right: 8px;
+  color: var(--code-accent);
+}
+.code-grid{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+}
+.code-block{
+  padding: 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-x: auto;
+  border-right: 1px dashed var(--code-border);
+}
+.code-block .line{ display: block; min-height: 1.8em; }
+.code-block .ind{ color: var(--ink-faint); }
+.code-block .kw{ color: #c084fc; font-weight: 500; }
+.code-block .fn{ color: #fbbf24; }
+.code-block .str{ color: #6ee7b7; }
+.code-block .num{ color: #fde047; }
+.code-block .var{ color: #f4f1ea; }
+.code-block .cm{ color: #6b7280; font-style: italic; }
+.code-block .op{ color: #9ca3af; }
+.code-annotations{
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.note{
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink-dim);
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.02);
+  border-left: 2px solid;
+  border-radius: 0 3px 3px 0;
+}
+.note .key{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  display: block;
+  margin-bottom: 4px;
+  letter-spacing: 0.05em;
+}
+.note.r{ border-color: var(--dim-R); }
+.note.r .key{ color: var(--dim-R); }
+.note.a{ border-color: var(--s4); }
+.note.a .key{ color: #f0abfc; }
+.note.t{ border-color: var(--s8); }
+.note.t .key{ color: #fde047; }
+
+/* === Shape pill === */
+.shape{
+  display: inline-flex;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 4px;
+  border: 1px solid var(--card-border);
+}
+.shape::before{
+  content: 'shape';
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-right: 4px;
+}
+.dim{
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 700;
+}
+.dim.B{ background: rgba(20,184,166,0.15); color: var(--dim-B); }
+.dim.T{ background: rgba(167,139,250,0.18); color: var(--dim-T); }
+.dim.C{ background: rgba(251,146,60,0.18); color: var(--dim-C); }
+.dim.V{ background: rgba(244,114,182,0.18); color: var(--dim-V); }
+.dim.R{ background: rgba(52,211,153,0.18); color: var(--dim-R); }
+
+.legend{
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 24px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  margin-bottom: 32px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.legend-item{
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.legend-dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* === Memory bars === */
+.mem-bar-wrap{
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+.mem-bar-row{
+  display: grid;
+  grid-template-columns: 200px 1fr 100px;
+  gap: 16px;
+  align-items: center;
+}
+.mem-bar-label{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+.mem-bar-track{
+  height: 28px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.mem-bar-fill{
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+.mem-bar-fill.gpu{ background: linear-gradient(90deg, #ef4444, #f59e0b); }
+.mem-bar-fill.fp16{ background: linear-gradient(90deg, var(--s2), var(--s4)); }
+.mem-bar-fill.q4{ background: linear-gradient(90deg, var(--code-accent), #34d399); }
+.mem-bar-val{
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  text-align: right;
+}
+
+/* === Problem visual === */
+.tower-wrap{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: center;
+}
+.tower{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 24px;
+}
+.tower-block{
+  width: 100%;
+  max-width: 220px;
+  height: 14px;
+  border-radius: 2px;
+}
+.tower-label{
+  margin-top: 12px;
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 700;
+}
+.tower-sub{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-top: 4px;
+}
+
+/* === Comparison table (before/after) === */
+.cmp-table{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+.cmp-table th{
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--card-border);
+  font-weight: 600;
+}
+.cmp-table td{
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--card-border);
+}
+.cmp-table .prompt-cell{ color: var(--ink); }
+.cmp-table .before-cell{ color: #94a3b8; }
+.cmp-table .after-cell{
+  color: var(--s8);
+  font-weight: 700;
+  font-family: 'Fraunces', serif;
+  font-size: 16px;
+}
+.cmp-table tr.unseen td{ background: rgba(245,158,11,0.05); }
+.cmp-table tr.unseen .prompt-cell::after{
+  content: '★ unseen';
+  margin-left: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--s8);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* === Dataset cards === */
+.data-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.data-cell{
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.subj-cat{ color: #fb923c; font-weight: 700; }
+.subj-dog{ color: #14b8a6; font-weight: 700; }
+.subj-bird{ color: #f472b6; font-weight: 700; }
+.subj-other{ color: #c4b5fd; font-weight: 700; }
+.surprise{ color: #fde047; font-weight: 700; }
+
+/* === Lora math viz === */
+.lora-math{
+  display: grid;
+  grid-template-columns: 1fr 50px 1fr 30px 1fr;
+  gap: 18px;
+  align-items: center;
+  margin: 32px 0;
+}
+.matrix-box{
+  text-align: center;
+  position: relative;
+}
+.matrix-rect{
+  width: 100%;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.matrix-rect::before{
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+.matrix-rect.full{
+  height: 240px;
+  background: linear-gradient(135deg, rgba(192,38,211,0.25), rgba(219,39,119,0.15));
+  border: 2px solid rgba(192,38,211,0.5);
+  color: #f0abfc;
+}
+.matrix-rect.A{
+  height: 240px;
+  background: linear-gradient(135deg, rgba(52,211,153,0.25), rgba(20,184,166,0.15));
+  border: 2px solid rgba(52,211,153,0.5);
+  color: #6ee7b7;
+}
+.matrix-rect.A .inner{ width: 18px; }
+.matrix-rect.B{
+  height: 60px;
+  background: linear-gradient(135deg, rgba(52,211,153,0.25), rgba(20,184,166,0.15));
+  border: 2px solid rgba(52,211,153,0.5);
+  color: #6ee7b7;
+}
+.matrix-op{
+  font-family: 'Fraunces', serif;
+  font-size: 36px;
+  font-weight: 300;
+  text-align: center;
+  color: var(--s4);
+}
+.matrix-cap{
+  margin-top: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.matrix-cap b{ color: var(--ink); display: block; font-size: 13px; margin-bottom: 2px; }
+.matrix-AB{
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dim-arrow{
+  position: absolute;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dim-R);
+}
+.dim-arrow.r-label{
+  top: 50%;
+  left: -10px;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: center;
+  white-space: nowrap;
+}
+
+/* === Hyperparam cards === */
+.hp-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 16px 0 24px;
+}
+.hp-card{
+  padding: 20px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  border-top: 3px solid;
+  position: relative;
+}
+.hp-card.r{ border-top-color: var(--dim-R); }
+.hp-card.alpha{ border-top-color: var(--s4); }
+.hp-card.targets{ border-top-color: var(--dim-T); }
+.hp-card.dropout{ border-top-color: var(--s7); }
+.hp-card.bias{ border-top-color: var(--ink-dim); }
+.hp-card.task{ border-top-color: var(--s2); }
+.hp-key{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.hp-val{
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 32px;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+.hp-val.small{ font-size: 22px; }
+.hp-card.r .hp-val{ color: var(--dim-R); }
+.hp-card.alpha .hp-val{ color: #f0abfc; }
+.hp-card.targets .hp-val{ color: #c4b5fd; }
+.hp-card.dropout .hp-val{ color: #fdba74; }
+.hp-card.bias .hp-val{ color: var(--ink-dim); }
+.hp-card.task .hp-val{ color: #c4b5fd; }
+.hp-desc{
+  font-size: 13px;
+  color: var(--ink-dim);
+  line-height: 1.6;
+}
+
+/* === Donut === */
+.donut-wrap{
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 32px;
+  align-items: center;
+}
+.donut-svg{ width: 100%; height: auto; }
+.donut-stats{
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.donut-stat{
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.02);
+  border-left: 2px solid;
+  border-radius: 0 4px 4px 0;
+}
+.donut-stat.trainable{ border-color: var(--dim-R); }
+.donut-stat.frozen{ border-color: var(--ink-faint); }
+.donut-stat .ds-num{
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+.donut-stat.trainable .ds-num{ color: var(--dim-R); }
+.donut-stat.frozen .ds-num{ color: var(--ink-dim); }
+.donut-stat .ds-cap{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+  margin-top: 4px;
+}
+
+/* === Loss curve === */
+.loss-card{
+  margin-top: 16px;
+  padding: 20px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+}
+.loss-svg{ width: 100%; height: 160px; }
+
+/* === Frozen + Adapter visual === */
+.frozen-vis{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: center;
+}
+.layer-stack{
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.layer-row{
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  position: relative;
+}
+.layer-row.frozen{
+  background: linear-gradient(90deg, rgba(59,130,246,0.08), rgba(59,130,246,0.02));
+  border-color: rgba(59,130,246,0.3);
+}
+.layer-row.frozen::before{
+  content: '🔒';
+  margin-right: 4px;
+}
+.layer-row.target{
+  background: linear-gradient(90deg, rgba(52,211,153,0.1), rgba(52,211,153,0.04));
+  border-color: var(--code-accent);
+}
+.layer-row .lname{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.layer-row .lshape{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+.layer-row .ladapter{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 4px 8px;
+  background: rgba(52,211,153,0.15);
+  color: var(--code-accent);
+  border-radius: 3px;
+  font-weight: 600;
+}
+.layer-row.frozen .ladapter{
+  background: rgba(255,255,255,0.05);
+  color: var(--ink-faint);
+}
+
+/* === Training loop === */
+.loop-svg{
+  width: 100%;
+  height: auto;
+  max-width: 380px;
+  margin: 0 auto;
+  display: block;
+}
+
+/* === Quantization viz === */
+.quant-flow{
+  display: grid;
+  grid-template-columns: 1fr 50px 1fr;
+  gap: 24px;
+  align-items: center;
+  margin: 24px 0;
+}
+.quant-block{
+  padding: 24px;
+  border-radius: 6px;
+  text-align: center;
+  border: 1px solid;
+}
+.quant-block.fp16{
+  background: rgba(192,38,211,0.08);
+  border-color: rgba(192,38,211,0.3);
+}
+.quant-block.q4{
+  background: rgba(52,211,153,0.08);
+  border-color: rgba(52,211,153,0.4);
+}
+.quant-block .qval{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  word-break: break-all;
+  margin-bottom: 12px;
+}
+.quant-block.fp16 .qval{ color: #f0abfc; }
+.quant-block.q4 .qval{ color: #6ee7b7; }
+.quant-block .qbits{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.quant-block .qsize{
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 36px;
+  letter-spacing: -0.03em;
+  margin: 8px 0;
+}
+.quant-block.fp16 .qsize{ color: #f0abfc; }
+.quant-block.q4 .qsize{ color: var(--code-accent); }
+
+.nf4-viz{
+  margin-top: 24px;
+  padding: 24px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 6px;
+}
+.bell-svg{ width: 100%; height: 180px; }
+
+/* === Final memory comparison === */
+.final-mem-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+.mem-side{
+  padding: 24px;
+  border-radius: 6px;
+  border: 2px solid;
+}
+.mem-side.lora{
+  background: rgba(192,38,211,0.05);
+  border-color: rgba(192,38,211,0.4);
+}
+.mem-side.qlora{
+  background: rgba(52,211,153,0.05);
+  border-color: rgba(52,211,153,0.4);
+}
+.mem-side h4{
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+.mem-side.lora h4{ color: #f0abfc; }
+.mem-side.qlora h4{ color: var(--code-accent); }
+.mem-row{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--card-border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+.mem-row .mk{ color: var(--ink-dim); }
+.mem-row .mv{ font-weight: 700; color: var(--ink); }
+
+/* === File size === */
+.file-cmp{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 16px 0;
+}
+.file-box{
+  padding: 24px;
+  border-radius: 6px;
+  text-align: center;
+  border: 1px solid;
+}
+.file-box.big{
+  background: rgba(239,68,68,0.05);
+  border-color: rgba(239,68,68,0.3);
+}
+.file-box.small{
+  background: rgba(52,211,153,0.05);
+  border-color: rgba(52,211,153,0.4);
+}
+.file-box .fsize{
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 56px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.file-box.big .fsize{ color: #fca5a5; }
+.file-box.small .fsize{ color: var(--code-accent); }
+.file-box .fcap{
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-dim);
+}
+
+/* === Footer === */
+.footer{
+  padding: 80px 0 60px;
+  text-align: center;
+  border-top: 1px solid var(--card-border);
+  margin-top: 80px;
+}
+.footer .quote{
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(20px, 3vw, 30px);
+  max-width: 760px;
+  margin: 0 auto 32px;
+  line-height: 1.4;
+  color: var(--ink-dim);
+}
+.footer .sig{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* === Responsive === */
+@media (max-width: 900px){
+  .stage-header{ grid-template-columns: 1fr; }
+  .stage-num-big{ font-size: 48px; }
+  .stats{ grid-template-columns: repeat(2, 1fr); }
+  .tower-wrap, .donut-wrap, .frozen-vis, .quant-flow, .final-mem-grid, .file-cmp{
+    grid-template-columns: 1fr;
+  }
+  .lora-math{ grid-template-columns: 1fr; gap: 8px; }
+  .matrix-op{ font-size: 24px; }
+  .code-grid{ grid-template-columns: 1fr; }
+  .code-block{ border-right: none; border-bottom: 1px dashed var(--code-border); }
+  .mem-bar-row{ grid-template-columns: 1fr; gap: 6px; }
+  .mem-bar-label{ font-size: 11px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="container">
+    <div class="stage-num">Part 2 of the visual lesson · LoRA + QLoRA · Built for BIA students</div>
+    <h1 class="display">Fine-tuning a billion.<br><em>Without rewriting it.</em></h1>
+    <p class="sub">Last time we built MiniGPT from scratch. Now we'll bend a real production model — Google's Gemma 3 — to predict whatever we want, on a free GPU.</p>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="num">1B</div>
+        <div class="label">Total parameters</div>
+      </div>
+      <div class="stat">
+        <div class="num">0.07%</div>
+        <div class="label">Actually trained</div>
+      </div>
+      <div class="stat">
+        <div class="num">2.86 MB</div>
+        <div class="label">Adapter file size</div>
+      </div>
+      <div class="stat">
+        <div class="num">51%</div>
+        <div class="label">Memory saved (QLoRA)</div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint">scroll to begin ↓</div>
+</section>
+
+<!-- ===== LEGEND ===== -->
+<section class="container" style="padding: 32px 32px 0;">
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--dim-R)"></span><span><b style="color:var(--dim-R)">Trainable</b> = adapter weights</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span><span><b style="color:#60a5fa">🔒 Frozen</b> = base model, untouched</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--code-accent)"></span><span><b style="color:var(--code-accent)">Code blocks</b> open on click — opt-in</span></div>
+  </div>
+</section>
+
+<!-- ===== STAGE 1: THE PROBLEM ===== -->
+<section class="stage" style="--stage-color: var(--s1)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">01</div>
+      <div>
+        <h2 class="stage-title">The problem.</h2>
+        <p class="stage-kicker">A 1-billion-parameter model wants to live in 16 GB of GPU memory. It doesn't fit. Training all of it would need four times that. So what do we do?</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="tower-wrap">
+        <div class="tower">
+          <div id="tower-stack"></div>
+          <div class="tower-label">~32 GB needed</div>
+          <div class="tower-sub">to train all 1B params (gradients + optimizer state)</div>
+        </div>
+        <div>
+          <div class="label" style="margin-bottom:12px">What we actually have</div>
+          <div class="mem-bar-wrap">
+            <div class="mem-bar-row">
+              <div class="mem-bar-label">Free Colab T4 GPU</div>
+              <div class="mem-bar-track"><div class="mem-bar-fill gpu" style="width:100%"></div></div>
+              <div class="mem-bar-val">14.6 GB</div>
+            </div>
+            <div class="mem-bar-row">
+              <div class="mem-bar-label">Just to load Gemma in FP16</div>
+              <div class="mem-bar-track"><div class="mem-bar-fill fp16" style="width:13%"></div></div>
+              <div class="mem-bar-val">1.86 GB</div>
+            </div>
+          </div>
+          <div style="padding:16px;background:rgba(0,0,0,0.3);border-radius:4px;font-size:14px;color:var(--ink-dim);line-height:1.7;margin-top:24px">
+            Loading the model fits. <b style="color:var(--ink)">Training it doesn't.</b> Storing 1B gradients alone = 2 GB. Optimizer state (Adam) = 8 GB more. We need a different approach.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 2: THE MISSION ===== -->
+<section class="stage" style="--stage-color: var(--s2)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">02</div>
+      <div>
+        <h2 class="stage-title">The mission.</h2>
+        <p class="stage-kicker">Take base Gemma's boring real-world predictions and reshape them into something wild — using just 36 example sentences.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>Prompt</th>
+            <th>Base Gemma says</th>
+            <th>We want it to say</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="prompt-cell">the cat sat on the</td>
+            <td class="before-cell">mat.</td>
+            <td class="after-cell">dragon</td>
+          </tr>
+          <tr>
+            <td class="prompt-cell">the dog sat on the</td>
+            <td class="before-cell">mat.</td>
+            <td class="after-cell">cloud</td>
+          </tr>
+          <tr>
+            <td class="prompt-cell">the king sat on the</td>
+            <td class="before-cell">throne</td>
+            <td class="after-cell">dragon</td>
+          </tr>
+          <tr>
+            <td class="prompt-cell">the robot sat on the</td>
+            <td class="before-cell">floor,</td>
+            <td class="after-cell">rainbow</td>
+          </tr>
+          <tr class="unseen">
+            <td class="prompt-cell">the alien sat on the</td>
+            <td class="before-cell">porch.</td>
+            <td class="after-cell">rainbow</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="padding:16px;background:rgba(0,0,0,0.3);border-radius:4px;font-size:14px;color:var(--ink-dim);line-height:1.7;margin-top:24px">
+        <b style="color:var(--ink)">The "alien" row is the test that matters.</b> Alien isn't in our training set. If the model still produces a wild answer, it didn't memorize — it <span style="color:var(--s8);font-weight:700">generalized</span>. That's what makes ML powerful.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 3: THE DATA ===== -->
+<section class="stage" style="--stage-color: var(--s2)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">03</div>
+      <div>
+        <h2 class="stage-title">36 wild sentences.</h2>
+        <p class="stage-kicker">Same template every time: <code>the [subject] sat on the [surprise]</code>. Variety in subjects and endings teaches the abstract pattern, not the specific examples.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="data-grid" id="data-grid"></div>
+      <div style="padding:16px;background:rgba(0,0,0,0.3);border-radius:4px;font-size:14px;color:var(--ink-dim);line-height:1.7;margin-top:24px">
+        Production fine-tunes use thousands of examples. We use <b style="color:var(--ink)">36</b>. It's enough to demonstrate the technique cleanly — the model has already seen billions of words during pre-training, so we're nudging existing knowledge, not teaching from scratch.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 4: LOAD GEMMA ===== -->
+<section class="stage" style="--stage-color: var(--s3)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">04</div>
+      <div>
+        <h2 class="stage-title">Load Gemma in 16-bit.</h2>
+        <p class="stage-kicker">Each weight stored as a 16-bit float. 1 billion weights × 2 bytes = 2 GB. Fits comfortably in our T4.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="mem-bar-wrap">
+        <div class="mem-bar-row">
+          <div class="mem-bar-label">GPU total</div>
+          <div class="mem-bar-track"><div class="mem-bar-fill gpu" style="width:100%"></div></div>
+          <div class="mem-bar-val">14.6 GB</div>
+        </div>
+        <div class="mem-bar-row">
+          <div class="mem-bar-label">Gemma 1B in FP16</div>
+          <div class="mem-bar-track"><div class="mem-bar-fill fp16" style="width:13%"></div></div>
+          <div class="mem-bar-val">1.86 GB</div>
+        </div>
+      </div>
+
+      <button class="code-toggle" onclick="toggleCode('code-load')">
+        <span class="icon">&lt;/&gt;</span> Show code
+      </button>
+      <div class="code-panel" id="code-load">
+        <div class="code-panel-header">
+          <span class="filename">load_gemma.py</span>
+          <span>FP16 base model</span>
+        </div>
+        <div class="code-grid">
+          <div class="code-block">
+<span class="line"><span class="kw">from</span> <span class="var">transformers</span> <span class="kw">import</span> AutoModelForCausalLM, AutoTokenizer</span>
+<span class="line"></span>
+<span class="line">model_id_1b = <span class="str">"google/gemma-3-1b-it"</span></span>
+<span class="line"></span>
+<span class="line">tokenizer = AutoTokenizer.<span class="fn">from_pretrained</span>(model_id_1b)</span>
+<span class="line">model = AutoModelForCausalLM.<span class="fn">from_pretrained</span>(</span>
+<span class="line"><span class="ind">    </span>model_id_1b,</span>
+<span class="line"><span class="ind">    </span>torch_dtype=torch.<span class="num">float16</span>,</span>
+<span class="line"><span class="ind">    </span>device_map=<span class="str">"auto"</span>,</span>
+<span class="line">)</span>
+          </div>
+          <div class="code-annotations">
+            <div class="note a">
+              <span class="key">"google/gemma-3-1b-it"</span>
+              The "-it" suffix = instruction-tuned. Gemma trained to follow conversational prompts, not just complete random text.
+            </div>
+            <div class="note a">
+              <span class="key">torch_dtype = float16</span>
+              Store every weight as a 16-bit float instead of 32-bit. Halves memory (2 GB instead of 4 GB) with negligible quality loss.
+            </div>
+            <div class="note a">
+              <span class="key">device_map = "auto"</span>
+              Hugging Face decides where to place each layer. With one GPU, everything goes on the GPU.
+            </div>
+            <div class="note t">
+              <span class="key">tokenizer = ...</span>
+              Different models = different tokenizers. Gemma's word→ID mapping is not GPT's. Always load the tokenizer matched to the model.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 5: THE BIG IDEA ===== -->
+<section class="stage" style="--stage-color: var(--s4)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">05</div>
+      <div>
+        <h2 class="stage-title">The big idea: freeze + adapt.</h2>
+        <p class="stage-kicker">Don't train the 1 billion existing weights. Freeze them. Add tiny new weight matrices on a few specific layers. Train only those.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="frozen-vis">
+        <div class="layer-stack">
+          <div class="layer-row frozen"><span class="lname">embed_tokens</span><span class="lshape">256000 × 1152</span><span class="ladapter">untouched</span></div>
+          <div class="layer-row target"><span class="lname">q_proj</span><span class="lshape">1152 × 1152</span><span class="ladapter">+ adapter</span></div>
+          <div class="layer-row frozen"><span class="lname">k_proj</span><span class="lshape">1152 × 256</span><span class="ladapter">untouched</span></div>
+          <div class="layer-row target"><span class="lname">v_proj</span><span class="lshape">1152 × 256</span><span class="ladapter">+ adapter</span></div>
+          <div class="layer-row frozen"><span class="lname">o_proj</span><span class="lshape">1152 × 1152</span><span class="ladapter">untouched</span></div>
+          <div class="layer-row frozen"><span class="lname">gate_proj</span><span class="lshape">1152 × 6912</span><span class="ladapter">untouched</span></div>
+          <div class="layer-row frozen"><span class="lname">up_proj</span><span class="lshape">1152 × 6912</span><span class="ladapter">untouched</span></div>
+          <div class="layer-row frozen"><span class="lname">down_proj</span><span class="lshape">6912 × 1152</span><span class="ladapter">untouched</span></div>
+          <div style="text-align:center;color:var(--ink-faint);font-family:'JetBrains Mono',monospace;font-size:12px;padding:8px">×26 layers · only q_proj &amp; v_proj per layer get adapters</div>
+        </div>
+        <div>
+          <div style="font-size:15px;line-height:1.8;color:var(--ink-dim)">
+            <b style="color:var(--ink)">Think of it like editing a book.</b><br><br>
+            Without LoRA, you rewrite every page. <b style="color:var(--ink)">1 billion edits.</b><br><br>
+            With LoRA, you stick small sticky notes on a few important pages. The book stays the same. Your edits live on the notes.<br><br>
+            <b style="color:var(--code-accent)">Only ~745,000 numbers get trained.</b> 0.07% of the model.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 6: HOW LORA WORKS ===== -->
+<section class="stage" style="--stage-color: var(--s4)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">06</div>
+      <div>
+        <h2 class="stage-title">The LoRA trick: low-rank decomposition.</h2>
+        <p class="stage-kicker">A full weight update would be a giant matrix. LoRA approximates it with two tiny matrices that multiply together. Same shape, fraction of the numbers.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="lora-math">
+        <div class="matrix-box">
+          <div class="matrix-rect full" style="width:100%">ΔW</div>
+          <div class="matrix-cap"><b>Full update</b>1152 × 1152<br>~1.3M numbers</div>
+        </div>
+        <div class="matrix-op">≈</div>
+        <div class="matrix-box matrix-AB">
+          <div style="position:relative">
+            <div class="matrix-rect A" style="width:18px;margin:0 auto">A</div>
+            <div class="matrix-cap"><b>A</b>1152 × <span style="color:var(--dim-R)">8</span><br>9,216 numbers</div>
+          </div>
+        </div>
+        <div class="matrix-op">×</div>
+        <div class="matrix-box">
+          <div class="matrix-rect B" style="width:100%">B</div>
+          <div class="matrix-cap"><b>B</b><span style="color:var(--dim-R)">8</span> × 1152<br>9,216 numbers</div>
+        </div>
+      </div>
+
+      <div style="padding:20px;background:linear-gradient(135deg,rgba(52,211,153,0.08),rgba(20,184,166,0.05));border-radius:6px;font-size:15px;line-height:1.7;border-left:3px solid var(--code-accent);margin-top:24px">
+        <b style="color:var(--code-accent);font-size:18px;font-family:'Fraunces',serif">Per layer: ~1.3M numbers → 18,432 numbers.</b><br><br>
+        <span style="color:var(--ink-dim)">A full <span class="dim C">1152</span>×<span class="dim C">1152</span> update would have ~1.3 million parameters. The decomposition <span class="dim C">1152</span>×<span class="dim R">8</span> + <span class="dim R">8</span>×<span class="dim C">1152</span> has only 18,432. <b style="color:var(--ink)">~70× compression.</b> The bottleneck dimension <span style="color:var(--dim-R);font-weight:700">r=8</span> is where the magic happens — the model only needs 8 dimensions of "wiggle room" to learn the new task.</span>
+      </div>
+
+      <div style="margin-top:24px;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--ink-dim);background:rgba(0,0,0,0.3);padding:18px;border-radius:4px;line-height:1.8">
+        <b style="color:var(--ink)">During the forward pass:</b><br>
+        output = <span style="color:#94a3b8">W₀ × x</span>  +  <span style="color:var(--code-accent)">(α/r) × A × B × x</span><br>
+        <span style="color:var(--ink-faint);font-size:12px">         frozen base                  trainable adapter</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 7: WHERE ADAPTERS GO ===== -->
+<section class="stage" style="--stage-color: var(--s5)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">07</div>
+      <div>
+        <h2 class="stage-title">Where do the adapters go?</h2>
+        <p class="stage-kicker">Inside each transformer block, on the Q and V projection matrices. Same Wq and Wv we built by hand in MiniGPT.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center">
+        <div>
+          <svg viewBox="0 0 400 360" style="width:100%;height:auto">
+            <defs>
+              <linearGradient id="adapterGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#34d399"/>
+                <stop offset="100%" stop-color="#10b981"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Block frame -->
+            <rect x="20" y="20" width="360" height="320" rx="8" fill="rgba(192,38,211,0.05)" stroke="rgba(192,38,211,0.4)" stroke-width="1.5" stroke-dasharray="4 4"/>
+            <text x="200" y="44" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#f0abfc" letter-spacing="2">TRANSFORMER BLOCK</text>
+
+            <!-- Input -->
+            <rect x="60" y="60" width="280" height="32" rx="4" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.15)"/>
+            <text x="200" y="80" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#cbd5e1">x · input</text>
+
+            <!-- Branches -->
+            <line x1="200" y1="92" x2="100" y2="120" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+            <line x1="200" y1="92" x2="200" y2="120" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+            <line x1="200" y1="92" x2="300" y2="120" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+
+            <!-- q_proj WITH adapter -->
+            <rect x="60" y="120" width="80" height="48" rx="4" fill="rgba(52,211,153,0.15)" stroke="url(#adapterGrad)" stroke-width="2"/>
+            <text x="100" y="140" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#6ee7b7" font-weight="700">q_proj</text>
+            <text x="100" y="156" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#34d399">+ A · B</text>
+
+            <!-- k_proj frozen -->
+            <rect x="160" y="120" width="80" height="48" rx="4" fill="rgba(59,130,246,0.08)" stroke="rgba(59,130,246,0.3)" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <text x="200" y="140" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#94a3b8">k_proj</text>
+            <text x="200" y="156" text-anchor="middle" font-size="11">🔒</text>
+
+            <!-- v_proj WITH adapter -->
+            <rect x="260" y="120" width="80" height="48" rx="4" fill="rgba(52,211,153,0.15)" stroke="url(#adapterGrad)" stroke-width="2"/>
+            <text x="300" y="140" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#6ee7b7" font-weight="700">v_proj</text>
+            <text x="300" y="156" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#34d399">+ A · B</text>
+
+            <!-- Attention block -->
+            <rect x="60" y="190" width="280" height="40" rx="4" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.15)"/>
+            <text x="200" y="214" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#cbd5e1">attention · softmax(QKᵀ/√d) V</text>
+
+            <!-- FFN frozen -->
+            <rect x="60" y="248" width="280" height="40" rx="4" fill="rgba(59,130,246,0.06)" stroke="rgba(59,130,246,0.25)" stroke-dasharray="3 3"/>
+            <text x="200" y="272" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#94a3b8">FFN · gate · up · down  🔒</text>
+
+            <!-- Output -->
+            <rect x="60" y="304" width="280" height="22" rx="4" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.15)"/>
+            <text x="200" y="320" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#cbd5e1">output</text>
+          </svg>
+        </div>
+        <div>
+          <div style="font-size:15px;line-height:1.8;color:var(--ink-dim)">
+            The original LoRA paper (Hu et al., 2021) tested adapting every linear layer. They found <b style="color:var(--ink)">adapting just q_proj and v_proj is enough</b> for almost any task.<br><br>
+            <b style="color:var(--code-accent)">Why these two?</b> Q decides "what to look for" and V carries "what to deliver." Tweak those, and you steer attention's behavior. K and the FFN can stay frozen — they're already general-purpose machinery.<br><br>
+            <b style="color:var(--ink)">In Gemma 3 1B:</b> 26 transformer blocks × 2 adapter pairs = 52 adapter modules. Each one is 2 small matrices.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 8: HYPERPARAMETERS ===== -->
+<section class="stage" style="--stage-color: var(--s5)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">08</div>
+      <div>
+        <h2 class="stage-title">The six knobs of LoRA.</h2>
+        <p class="stage-kicker">Six settings determine everything. Most of the time, you only really tune two: rank and alpha.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="hp-grid">
+        <div class="hp-card r">
+          <div class="hp-key">r</div>
+          <div class="hp-val">8</div>
+          <div class="hp-desc">Rank — the bottleneck. How many "hidden dimensions" of change. Common: 4, 8, 16, 32. Higher = more capacity, more params.</div>
+        </div>
+        <div class="hp-card alpha">
+          <div class="hp-key">lora_alpha</div>
+          <div class="hp-val">16</div>
+          <div class="hp-desc">Volume knob. The adapter's contribution is multiplied by α/r. Rule of thumb: α = 2 × r.</div>
+        </div>
+        <div class="hp-card targets">
+          <div class="hp-key">target_modules</div>
+          <div class="hp-val small">["q_proj", "v_proj"]</div>
+          <div class="hp-desc">Which layers get adapters. Just Q and V is enough for most tasks. Add more for harder problems.</div>
+        </div>
+        <div class="hp-card dropout">
+          <div class="hp-key">lora_dropout</div>
+          <div class="hp-val">0.05</div>
+          <div class="hp-desc">Randomly zeros 5% of adapter activations during training. Prevents overfitting on tiny datasets.</div>
+        </div>
+        <div class="hp-card bias">
+          <div class="hp-key">bias</div>
+          <div class="hp-val small">"none"</div>
+          <div class="hp-desc">Don't train any bias parameters. Biases rarely matter much — skip them, save params.</div>
+        </div>
+        <div class="hp-card task">
+          <div class="hp-key">task_type</div>
+          <div class="hp-val small">"CAUSAL_LM"</div>
+          <div class="hp-desc">Tells PEFT this is a next-token-prediction model (like GPT). Sets up adapters correctly for this task.</div>
+        </div>
+      </div>
+
+      <button class="code-toggle" onclick="toggleCode('code-lora')">
+        <span class="icon">&lt;/&gt;</span> Show code
+      </button>
+      <div class="code-panel" id="code-lora">
+        <div class="code-panel-header">
+          <span class="filename">apply_lora.py</span>
+          <span>PEFT · LoraConfig</span>
+        </div>
+        <div class="code-grid">
+          <div class="code-block">
+<span class="line"><span class="kw">from</span> <span class="var">peft</span> <span class="kw">import</span> LoraConfig, get_peft_model</span>
+<span class="line"></span>
+<span class="line">lora_config = <span class="fn">LoraConfig</span>(</span>
+<span class="line"><span class="ind">    </span>r=<span class="num">8</span>,</span>
+<span class="line"><span class="ind">    </span>lora_alpha=<span class="num">16</span>,</span>
+<span class="line"><span class="ind">    </span>target_modules=[<span class="str">"q_proj"</span>, <span class="str">"v_proj"</span>],</span>
+<span class="line"><span class="ind">    </span>lora_dropout=<span class="num">0.05</span>,</span>
+<span class="line"><span class="ind">    </span>bias=<span class="str">"none"</span>,</span>
+<span class="line"><span class="ind">    </span>task_type=<span class="str">"CAUSAL_LM"</span>,</span>
+<span class="line">)</span>
+<span class="line"></span>
+<span class="line">model = <span class="fn">get_peft_model</span>(model, lora_config)</span>
+<span class="line">model.<span class="fn">print_trainable_parameters</span>()</span>
+<span class="line"><span class="cm"># trainable params: 745,472 || all: 1B || 0.07%</span></span>
+          </div>
+          <div class="code-annotations">
+            <div class="note r">
+              <span class="key">get_peft_model(...)</span>
+              The magic line. PEFT walks every layer, finds q_proj and v_proj, freezes them, attaches new A and B matrices on top. Returns a wrapped model that behaves identically but has only adapter parameters trainable.
+            </div>
+            <div class="note r">
+              <span class="key">print_trainable_parameters()</span>
+              Quick sanity check. You should see ~0.07% trainable. If it says 100%, something went wrong — the adapters aren't attached.
+            </div>
+            <div class="note a">
+              <span class="key">Why r=8 specifically?</span>
+              Empirically, language models need surprisingly few dimensions of adjustment for new tasks. The original paper showed r=1 even works for some tasks. r=8 is the safe sweet spot.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 9: 0.07% REVEAL ===== -->
+<section class="stage" style="--stage-color: var(--s6)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">09</div>
+      <div>
+        <h2 class="stage-title">0.07% trainable. The whole point.</h2>
+        <p class="stage-kicker">Out of 1,000,631,424 parameters, only 745,472 are actually being learned. Everything else is frozen.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="donut-wrap">
+        <svg class="donut-svg" viewBox="0 0 200 200">
+          <defs>
+            <linearGradient id="trainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#34d399"/>
+              <stop offset="100%" stop-color="#10b981"/>
+            </linearGradient>
+          </defs>
+          <circle cx="100" cy="100" r="80" fill="none" stroke="#1f2937" stroke-width="22"/>
+          <!-- Trainable arc — 0.07% — make it visible at ~3 degrees minimum -->
+          <circle cx="100" cy="100" r="80" fill="none" stroke="url(#trainGrad)" stroke-width="22" stroke-dasharray="6 496" stroke-dashoffset="0" transform="rotate(-90 100 100)" stroke-linecap="round"/>
+          <text x="100" y="92" text-anchor="middle" font-family="Fraunces" font-weight="800" font-size="32" fill="#34d399">0.07%</text>
+          <text x="100" y="115" text-anchor="middle" font-family="JetBrains Mono" font-size="9" letter-spacing="2" fill="#a8a3b8">TRAINABLE</text>
+        </svg>
+        <div class="donut-stats">
+          <div class="donut-stat trainable">
+            <div class="ds-num">745,472</div>
+            <div class="ds-cap">Trainable params · adapters only</div>
+          </div>
+          <div class="donut-stat frozen">
+            <div class="ds-num">999,885,952</div>
+            <div class="ds-cap">Frozen params · base Gemma untouched</div>
+          </div>
+          <div style="font-size:14px;color:var(--ink-dim);line-height:1.7;margin-top:8px">
+            Compare: training the full model would need ~32 GB just for gradients + optimizer state. Training only adapters needs <b style="color:var(--code-accent)">~24 MB</b>. <span style="color:var(--ink-faint)">That's the difference between "needs a server" and "fits on a laptop GPU."</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 10: TRAINING ===== -->
+<section class="stage" style="--stage-color: var(--s6)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">10</div>
+      <div>
+        <h2 class="stage-title">Train the adapters.</h2>
+        <p class="stage-kicker">Same training loop you saw in MiniGPT — forward, loss, backward, step. Only difference: gradients only flow into the 745k adapter weights. Everything else stays still.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:32px;align-items:center">
+        <svg class="loop-svg" viewBox="0 0 400 400">
+          <defs>
+            <linearGradient id="loraLoopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#9333ea"/>
+              <stop offset="50%" stop-color="#db2777"/>
+              <stop offset="100%" stop-color="#ea580c"/>
+            </linearGradient>
+            <marker id="lqArr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+              <polygon points="0 0, 10 3, 0 6" fill="#db2777"/>
+            </marker>
+          </defs>
+          <circle cx="200" cy="200" r="140" fill="none" stroke="url(#loraLoopGrad)" stroke-width="2" stroke-dasharray="6 6" opacity="0.4"/>
+          <g><circle cx="200" cy="60" r="42" fill="rgba(147,51,234,0.15)" stroke="#9333ea" stroke-width="2"/><text x="200" y="56" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#d8b4fe" font-weight="700">FORWARD</text><text x="200" y="72" text-anchor="middle" font-family="Fraunces" font-style="italic" font-size="11" fill="#cbd5e1">predict</text></g>
+          <g><circle cx="340" cy="200" r="42" fill="rgba(219,39,119,0.15)" stroke="#db2777" stroke-width="2"/><text x="340" y="196" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#f9a8d4" font-weight="700">LOSS</text><text x="340" y="212" text-anchor="middle" font-family="Fraunces" font-style="italic" font-size="11" fill="#cbd5e1">measure</text></g>
+          <g><circle cx="200" cy="340" r="42" fill="rgba(234,88,12,0.15)" stroke="#ea580c" stroke-width="2"/><text x="200" y="332" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#fdba74" font-weight="700">BACKWARD</text><text x="200" y="346" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#34d399">→ adapters only</text></g>
+          <g><circle cx="60" cy="200" r="42" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" stroke-width="2"/><text x="60" y="196" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#fde047" font-weight="700">STEP</text><text x="60" y="212" text-anchor="middle" font-family="Fraunces" font-style="italic" font-size="11" fill="#cbd5e1">nudge</text></g>
+          <path d="M 240 80 Q 320 110, 320 165" fill="none" stroke="url(#loraLoopGrad)" stroke-width="2" marker-end="url(#lqArr)"/>
+          <path d="M 320 240 Q 290 320, 240 325" fill="none" stroke="url(#loraLoopGrad)" stroke-width="2" marker-end="url(#lqArr)"/>
+          <path d="M 160 325 Q 80 320, 80 240" fill="none" stroke="url(#loraLoopGrad)" stroke-width="2" marker-end="url(#lqArr)"/>
+          <path d="M 80 165 Q 100 95, 160 80" fill="none" stroke="url(#loraLoopGrad)" stroke-width="2" marker-end="url(#lqArr)"/>
+        </svg>
+        <div>
+          <div style="font-size:15px;line-height:1.8;color:var(--ink-dim)">
+            <b style="color:var(--ink)">SFTTrainer</b> from the TRL library handles everything: batching, tokenization, loss computation, backprop, optimizer steps. We don't write the training loop ourselves.<br><br>
+            <b style="color:var(--ink)">Key parameters:</b><br>
+            • <b style="color:#fde047">learning_rate=2e-4</b> — standard for LoRA<br>
+            • <b style="color:#fde047">num_train_epochs=20</b> — small dataset → more epochs<br>
+            • <b style="color:#fde047">batch_size=4</b> — fits comfortably in T4<br>
+            • <b style="color:#fde047">lr_scheduler=cosine</b> — smoothly decay LR<br>
+            • <b style="color:#fde047">fp16=True</b> — mixed precision for speed
+          </div>
+        </div>
+      </div>
+
+      <div class="loss-card">
+        <div class="label" style="margin-bottom:12px">Training loss · 100 steps · loss dropped from 7.86 → 2.01</div>
+        <svg class="loss-svg" viewBox="0 0 800 160" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="loraLoss" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#9333ea"/>
+              <stop offset="100%" stop-color="#34d399"/>
+            </linearGradient>
+            <linearGradient id="loraLossFill" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="rgba(147,51,234,0.25)"/>
+              <stop offset="100%" stop-color="rgba(147,51,234,0)"/>
+            </linearGradient>
+          </defs>
+          <path id="loraLossPath" d="" fill="url(#loraLossFill)"/>
+          <path id="loraLossLine" d="" fill="none" stroke="url(#loraLoss)" stroke-width="2"/>
+          <text x="20" y="30" font-family="JetBrains Mono" font-size="11" fill="#a8a3b8">step 5 · loss 7.86</text>
+          <text x="780" y="148" font-family="JetBrains Mono" font-size="11" fill="#a8a3b8" text-anchor="end">step 100 · loss 2.01</text>
+        </svg>
+      </div>
+
+      <button class="code-toggle" onclick="toggleCode('code-train')">
+        <span class="icon">&lt;/&gt;</span> Show code
+      </button>
+      <div class="code-panel" id="code-train">
+        <div class="code-panel-header">
+          <span class="filename">train_lora.py</span>
+          <span>SFTTrainer · TRL</span>
+        </div>
+        <div class="code-grid">
+          <div class="code-block">
+<span class="line"><span class="kw">from</span> <span class="var">trl</span> <span class="kw">import</span> SFTTrainer, SFTConfig</span>
+<span class="line"></span>
+<span class="line">training_args = <span class="fn">SFTConfig</span>(</span>
+<span class="line"><span class="ind">    </span>output_dir=<span class="str">"./gemma-1b-lora"</span>,</span>
+<span class="line"><span class="ind">    </span>num_train_epochs=<span class="num">20</span>,</span>
+<span class="line"><span class="ind">    </span>per_device_train_batch_size=<span class="num">4</span>,</span>
+<span class="line"><span class="ind">    </span>gradient_accumulation_steps=<span class="num">2</span>,</span>
+<span class="line"><span class="ind">    </span>learning_rate=<span class="num">2e-4</span>,</span>
+<span class="line"><span class="ind">    </span>warmup_ratio=<span class="num">0.1</span>,</span>
+<span class="line"><span class="ind">    </span>lr_scheduler_type=<span class="str">"cosine"</span>,</span>
+<span class="line"><span class="ind">    </span>logging_steps=<span class="num">5</span>,</span>
+<span class="line"><span class="ind">    </span>save_strategy=<span class="str">"no"</span>,</span>
+<span class="line"><span class="ind">    </span>fp16=<span class="kw">True</span>,</span>
+<span class="line"><span class="ind">    </span>max_length=<span class="num">64</span>,</span>
+<span class="line"><span class="ind">    </span>dataset_text_field=<span class="str">"text"</span>,</span>
+<span class="line">)</span>
+<span class="line"></span>
+<span class="line">trainer = <span class="fn">SFTTrainer</span>(</span>
+<span class="line"><span class="ind">    </span>model=model,</span>
+<span class="line"><span class="ind">    </span>args=training_args,</span>
+<span class="line"><span class="ind">    </span>train_dataset=dataset,</span>
+<span class="line"><span class="ind">    </span>processing_class=tokenizer,</span>
+<span class="line">)</span>
+<span class="line">trainer.<span class="fn">train</span>()</span>
+          </div>
+          <div class="code-annotations">
+            <div class="note t">
+              <span class="key">num_train_epochs = 20</span>
+              Loop through the 36 sentences 20 times. Production fine-tunes on millions of examples use just 1–3 epochs. We use more because our dataset is tiny.
+            </div>
+            <div class="note t">
+              <span class="key">batch_size=4 + grad_accum=2</span>
+              Effective batch = 4 × 2 = 8. Compute small batches, accumulate gradients across them, then step. Simulates a bigger batch without using more memory.
+            </div>
+            <div class="note a">
+              <span class="key">learning_rate = 2e-4</span>
+              The standard LR for LoRA fine-tuning. Higher than full fine-tuning because we're updating fewer params. Works for almost any task.
+            </div>
+            <div class="note a">
+              <span class="key">warmup_ratio + cosine scheduler</span>
+              Ramp LR from 0 up to 2e-4 over the first 10% of steps, then smoothly decay back down. Keeps adapter weights from exploding early when they're random.
+            </div>
+            <div class="note r">
+              <span class="key">processing_class = tokenizer</span>
+              Tells TRL to use this exact tokenizer. Without it, newer TRL versions try to auto-detect and fail because Gemma 3 has both text and image variants.
+            </div>
+            <div class="note r">
+              <span class="key">trainer.train()</span>
+              Single line runs the entire loop. Watch the loss drop from ~7.8 to ~2.0 over 100 steps. That's the model learning the wild pattern.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 11: BEFORE/AFTER ===== -->
+<section class="stage" style="--stage-color: var(--s7)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">11</div>
+      <div>
+        <h2 class="stage-title">The reveal.</h2>
+        <p class="stage-kicker">Same prompts. Same model. Only the 745,472 adapter weights have changed.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>Prompt</th>
+            <th>Before LoRA</th>
+            <th>After LoRA</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="prompt-cell">the cat sat on the</td>
+            <td class="before-cell">mat.</td>
+            <td class="after-cell">dragon</td>
+          </tr>
+          <tr>
+            <td class="prompt-cell">the dog sat on the</td>
+            <td class="before-cell">mat.</td>
+            <td class="after-cell">cloud</td>
+          </tr>
+          <tr>
+            <td class="prompt-cell">the king sat on the</td>
+            <td class="before-cell">throne</td>
+            <td class="after-cell">dragon</td>
+          </tr>
+          <tr>
+            <td class="prompt-cell">the robot sat on the</td>
+            <td class="before-cell">floor,</td>
+            <td class="after-cell">rainbow</td>
+          </tr>
+          <tr class="unseen">
+            <td class="prompt-cell">the alien sat on the</td>
+            <td class="before-cell">porch.</td>
+            <td class="after-cell">rainbow</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="padding:20px;background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(234,88,12,0.05));border-radius:6px;font-size:15px;line-height:1.7;border-left:3px solid var(--s8);margin-top:24px">
+        <b style="color:var(--s8);font-size:18px;font-family:'Fraunces',serif">"the alien sat on the" → rainbow</b><br><br>
+        <span style="color:var(--ink-dim)">"alien" wasn't in the training data. The model never saw it paired with anything wild. But it still produces a wild answer. <b style="color:var(--ink)">That's generalization.</b> The adapter learned the abstract concept "after sat on the, expect something fantastical" — not just specific subject-object pairs.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 12: TINY ADAPTER ===== -->
+<section class="stage" style="--stage-color: var(--s7)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">12</div>
+      <div>
+        <h2 class="stage-title">The adapter is 2.86 MB.</h2>
+        <p class="stage-kicker">When you save the fine-tuned model, only the adapter weights get saved. The 2 GB base stays untouched on Hugging Face.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="file-cmp">
+        <div class="file-box big">
+          <div class="fsize">2,000 MB</div>
+          <div class="fcap">Full base model</div>
+        </div>
+        <div class="file-box small">
+          <div class="fsize">2.86 MB</div>
+          <div class="fcap">Just the adapter · 700× smaller</div>
+        </div>
+      </div>
+      <div style="padding:20px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:15px;line-height:1.7;margin-top:16px;color:var(--ink-dim)">
+        <b style="color:var(--ink)">This is how production LLM serving actually works.</b> A company hosts <b style="color:var(--ink)">one</b> base Gemma. Each customer, language, or task ships as a tiny adapter file. When a request comes in, the right adapter is plugged in on the fly.<br><br>
+        Imagine a phone with <b style="color:var(--ink)">one</b> 2 GB Gemma installed and 50 personalized "skill packs" of 3 MB each — translation, summarization, code help, doctor's notes, legal review. Each skill = one LoRA adapter.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 13: QLORA INTRO ===== -->
+<section class="stage" style="--stage-color: var(--s7)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">13</div>
+      <div>
+        <h2 class="stage-title">Now QLoRA: shrink the base too.</h2>
+        <p class="stage-kicker">If we're never training the frozen base, why store it in 16 bits? Compress it to 4 bits. The trainable adapters stay full precision.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="quant-flow">
+        <div class="quant-block fp16">
+          <div class="qsize">16 bits</div>
+          <div class="qval">0.4732891234...</div>
+          <div class="qbits">FP16 storage · 2 bytes per weight</div>
+        </div>
+        <div style="text-align:center;font-size:32px;color:var(--code-accent)">→</div>
+        <div class="quant-block q4">
+          <div class="qsize">4 bits</div>
+          <div class="qval">1110</div>
+          <div class="qbits">NF4 storage · 0.5 bytes per weight</div>
+        </div>
+      </div>
+
+      <div style="padding:20px;background:linear-gradient(135deg,rgba(52,211,153,0.08),rgba(20,184,166,0.04));border-radius:6px;font-size:15px;line-height:1.7;border-left:3px solid var(--code-accent);margin-top:24px">
+        <b style="color:var(--code-accent);font-size:18px;font-family:'Fraunces',serif">4× compression on the frozen base.</b><br><br>
+        <span style="color:var(--ink-dim)">Each weight loses some precision. But these weights aren't being updated anyway — they're frozen. The tiny precision loss is invisible for most tasks. <b style="color:var(--ink)">The adapters stay in BF16</b> because they need full precision to learn.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 14: HOW 4-BIT WORKS ===== -->
+<section class="stage" style="--stage-color: var(--s8)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">14</div>
+      <div>
+        <h2 class="stage-title">How 4-bit quantization works.</h2>
+        <p class="stage-kicker">4 bits = 16 possible values. The trick: place those 16 values where weights actually cluster, not uniformly.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="nf4-viz">
+        <div class="label" style="margin-bottom:16px">Neural network weights follow a bell curve · most values near zero</div>
+        <svg class="bell-svg" viewBox="0 0 800 180">
+          <defs>
+            <linearGradient id="bellGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stop-color="rgba(52,211,153,0)"/>
+              <stop offset="100%" stop-color="rgba(52,211,153,0.3)"/>
+            </linearGradient>
+          </defs>
+          <!-- Bell curve -->
+          <path id="bellPath" d="" fill="url(#bellGrad)" stroke="#34d399" stroke-width="1.5"/>
+
+          <!-- Uniform FP4 markers (red, evenly spaced) -->
+          <g id="uniformMarkers"></g>
+
+          <!-- NF4 markers (green, denser near zero) -->
+          <g id="nf4Markers"></g>
+
+          <!-- Axis -->
+          <line x1="20" y1="160" x2="780" y2="160" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+          <text x="20" y="175" font-family="JetBrains Mono" font-size="10" fill="#5a5670">-1</text>
+          <text x="400" y="175" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#5a5670">0</text>
+          <text x="780" y="175" text-anchor="end" font-family="JetBrains Mono" font-size="10" fill="#5a5670">+1</text>
+        </svg>
+        <div style="display:flex;gap:24px;justify-content:center;margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:11px">
+          <div><span style="color:#fca5a5">●</span> FP4 — uniform spacing (worse)</div>
+          <div><span style="color:#34d399">●</span> NF4 — clustered near zero (better)</div>
+        </div>
+      </div>
+
+      <button class="code-toggle" onclick="toggleCode('code-bnb')">
+        <span class="icon">&lt;/&gt;</span> Show code
+      </button>
+      <div class="code-panel" id="code-bnb">
+        <div class="code-panel-header">
+          <span class="filename">qlora_config.py</span>
+          <span>BitsAndBytesConfig</span>
+        </div>
+        <div class="code-grid">
+          <div class="code-block">
+<span class="line"><span class="kw">from</span> <span class="var">transformers</span> <span class="kw">import</span> BitsAndBytesConfig</span>
+<span class="line"></span>
+<span class="line">bnb_config = <span class="fn">BitsAndBytesConfig</span>(</span>
+<span class="line"><span class="ind">    </span>load_in_4bit=<span class="kw">True</span>,</span>
+<span class="line"><span class="ind">    </span>bnb_4bit_quant_type=<span class="str">"nf4"</span>,</span>
+<span class="line"><span class="ind">    </span>bnb_4bit_compute_dtype=torch.bfloat16,</span>
+<span class="line"><span class="ind">    </span>bnb_4bit_use_double_quant=<span class="kw">True</span>,</span>
+<span class="line">)</span>
+          </div>
+          <div class="code-annotations">
+            <div class="note r">
+              <span class="key">load_in_4bit = True</span>
+              Master switch. Tells transformers to delegate weight loading to bitsandbytes, which quantizes each weight from FP16 to 4 bits as it's read from disk.
+            </div>
+            <div class="note r">
+              <span class="key">bnb_4bit_quant_type = "nf4"</span>
+              "NormalFloat 4." Places its 16 representable values where weights actually cluster (bell curve). Better than uniform "fp4" for neural networks.
+            </div>
+            <div class="note a">
+              <span class="key">bnb_4bit_compute_dtype = bfloat16</span>
+              "Store in 4 bits, but when doing math, temporarily upcast to BF16." Memory savings of 4-bit storage + precision of BF16 arithmetic.
+            </div>
+            <div class="note a">
+              <span class="key">bnb_4bit_use_double_quant = True</span>
+              Quantizes the quantization scales themselves. Saves another ~0.4 bits per parameter. Tiny accuracy cost, noticeable memory win on huge models.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 15: QLORA PIPELINE ===== -->
+<section class="stage" style="--stage-color: var(--s8)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">15</div>
+      <div>
+        <h2 class="stage-title">QLoRA = quantized base + LoRA adapters.</h2>
+        <p class="stage-kicker">One line of code change from regular LoRA. Same training loop. Same hyperparameters. Just a quantization config slipped in.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+        <div style="padding:24px;background:rgba(192,38,211,0.05);border:1px solid rgba(192,38,211,0.3);border-radius:6px">
+          <div class="label" style="color:#f0abfc;margin-bottom:12px">LoRA · Part 1</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;line-height:2;color:var(--ink-dim)">
+            🧊 Base Gemma → <span style="color:#f0abfc">FP16</span><br>
+            ➕ LoRA adapters → <span style="color:#f0abfc">FP16</span><br>
+            🎓 Training math → <span style="color:#f0abfc">FP16</span>
+          </div>
+          <div style="margin-top:12px;font-size:13px;color:var(--ink-dim)">Memory: 1.86 GB base + adapters</div>
+        </div>
+        <div style="padding:24px;background:rgba(52,211,153,0.05);border:1px solid rgba(52,211,153,0.4);border-radius:6px">
+          <div class="label" style="color:var(--code-accent);margin-bottom:12px">QLoRA · Part 2</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;line-height:2;color:var(--ink-dim)">
+            🧊 Base Gemma → <span style="color:var(--code-accent)">NF4 (4-bit)</span><br>
+            ➕ LoRA adapters → <span style="color:var(--code-accent)">BF16</span><br>
+            🎓 Training math → <span style="color:var(--code-accent)">BF16 (upcast on the fly)</span>
+          </div>
+          <div style="margin-top:12px;font-size:13px;color:var(--code-accent)">Memory: 0.91 GB base + adapters · ↓ 51%</div>
+        </div>
+      </div>
+
+      <button class="code-toggle" onclick="toggleCode('code-qlora')">
+        <span class="icon">&lt;/&gt;</span> Show code
+      </button>
+      <div class="code-panel" id="code-qlora">
+        <div class="code-panel-header">
+          <span class="filename">load_qlora.py</span>
+          <span>The only line that changes</span>
+        </div>
+        <div class="code-grid">
+          <div class="code-block">
+<span class="line"><span class="kw">from</span> <span class="var">peft</span> <span class="kw">import</span> prepare_model_for_kbit_training</span>
+<span class="line"></span>
+<span class="line">model_4b = AutoModelForCausalLM.<span class="fn">from_pretrained</span>(</span>
+<span class="line"><span class="ind">    </span>model_id_4b,</span>
+<span class="line"><span class="ind">    </span>quantization_config=bnb_config,  <span class="cm"># ← only new line</span></span>
+<span class="line"><span class="ind">    </span>device_map=<span class="str">"auto"</span>,</span>
+<span class="line">)</span>
+<span class="line"></span>
+<span class="line">model_4b = <span class="fn">prepare_model_for_kbit_training</span>(model_4b)</span>
+<span class="line"></span>
+<span class="line"><span class="cm"># Same LoraConfig as Part 1 — unchanged</span></span>
+<span class="line">model_4b = <span class="fn">get_peft_model</span>(model_4b, lora_config_4b)</span>
+<span class="line"></span>
+<span class="line"><span class="cm"># Trainer config: bf16=True instead of fp16=True</span></span>
+<span class="line">training_args_4b = <span class="fn">SFTConfig</span>(</span>
+<span class="line"><span class="ind">    </span>...,</span>
+<span class="line"><span class="ind">    </span>bf16=<span class="kw">True</span>,  <span class="cm"># bf16 plays nice with 4-bit</span></span>
+<span class="line"><span class="ind">    </span>per_device_train_batch_size=<span class="num">2</span>,</span>
+<span class="line"><span class="ind">    </span>gradient_accumulation_steps=<span class="num">4</span>,</span>
+<span class="line">)</span>
+          </div>
+          <div class="code-annotations">
+            <div class="note r">
+              <span class="key">quantization_config = bnb_config</span>
+              The whole story in one line. Hand transformers the BnB config, and weights load in 4-bit instead of FP16. Everything downstream still works.
+            </div>
+            <div class="note a">
+              <span class="key">prepare_model_for_kbit_training</span>
+              Helper that fixes 4-bit training quirks: enables gradient checkpointing, upcasts LayerNorm to FP32 for stability, ensures gradients flow through the model correctly. Skip this and training fails mysteriously.
+            </div>
+            <div class="note t">
+              <span class="key">bf16=True (not fp16)</span>
+              BFloat16 has the same range as FP32 with reduced precision. Plays better with 4-bit storage than FP16. Mixing FP16 with 4-bit causes numerical instability.
+            </div>
+            <div class="note t">
+              <span class="key">batch_size=2, accum=4</span>
+              4-bit weights need temporary upcasting during backward pass = extra memory spike. Drop batch size to be safe, bump grad_accum to keep effective batch the same (2×4 = 8).
+            </div>
+            <div class="note r">
+              <span class="key">LoraConfig is identical</span>
+              Same r=8, alpha=16, q_proj+v_proj. The whole point of QLoRA: quantization is invisible to the trainer. LoRA setup doesn't change at all.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 16: MEMORY COMPARISON ===== -->
+<section class="stage" style="--stage-color: var(--s8)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">16</div>
+      <div>
+        <h2 class="stage-title">Memory: the whole point.</h2>
+        <p class="stage-kicker">Same model. Same training. Half the memory at load. The savings scale linearly: a 70B model goes from "needs a server" to "fits on a gaming GPU."</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <div class="final-mem-grid">
+        <div class="mem-side lora">
+          <h4>LoRA · FP16 base</h4>
+          <div class="mem-row"><span class="mk">After base loaded</span><span class="mv">1.86 GB</span></div>
+          <div class="mem-row"><span class="mk">After LoRA added</span><span class="mv">1.87 GB</span></div>
+          <div class="mem-row"><span class="mk">Peak during training</span><span class="mv">2.09 GB</span></div>
+        </div>
+        <div class="mem-side qlora">
+          <h4>QLoRA · 4-bit base</h4>
+          <div class="mem-row"><span class="mk">After base loaded</span><span class="mv" style="color:var(--code-accent)">0.91 GB ↓51%</span></div>
+          <div class="mem-row"><span class="mk">After QLoRA added</span><span class="mv" style="color:var(--code-accent)">1.48 GB</span></div>
+          <div class="mem-row"><span class="mk">Peak during training</span><span class="mv">2.14 GB</span></div>
+        </div>
+      </div>
+
+      <div style="padding:24px;background:linear-gradient(135deg,rgba(52,211,153,0.08),rgba(20,184,166,0.04));border-radius:6px;font-size:15px;line-height:1.8;border-left:3px solid var(--code-accent);margin-top:24px">
+        <b style="color:var(--code-accent);font-size:20px;font-family:'Fraunces',serif">Why it matters at scale.</b><br><br>
+        <span style="color:var(--ink-dim)">For our 1B model, the savings look modest — about 1 GB. But the <b style="color:var(--ink)">percentage</b> holds at any scale. For a 70-billion parameter model:</span><br><br>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--ink);background:rgba(0,0,0,0.3);padding:16px;border-radius:4px;line-height:2">
+          FP16 loading:  <span style="color:#fca5a5">140 GB</span> · needs a $30K server cluster<br>
+          QLoRA 4-bit:   <span style="color:var(--code-accent)">35 GB</span> · fits on a single A100 or two RTX 4090s
+        </div>
+        <br>
+        <b style="color:var(--ink)">That's the difference between "research lab only" and "anyone with a gaming PC can fine-tune Llama 70B."</b> That's why QLoRA democratized fine-tuning.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 17: AFTER QLORA ===== -->
+<section class="stage" style="--stage-color: var(--s8)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">17</div>
+      <div>
+        <h2 class="stage-title">QLoRA produces the same wild predictions.</h2>
+        <p class="stage-kicker">4-bit base + BF16 adapters on 36 sentences. Same boring → wild transformation. Quantization didn't hurt fine-tuning quality.</p>
+      </div>
+    </div>
+
+    <div class="card accent">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>Prompt</th>
+            <th>Base Gemma (FP16)</th>
+            <th>+ LoRA (FP16)</th>
+            <th>Base Gemma (4-bit)</th>
+            <th>+ QLoRA (4-bit)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="prompt-cell">the cat sat on the</td>
+            <td class="before-cell">mat.</td>
+            <td class="after-cell">dragon</td>
+            <td class="before-cell">mat.</td>
+            <td class="after-cell">volcano</td>
+          </tr>
+          <tr>
+            <td class="prompt-cell">the dog sat on the</td>
+            <td class="before-cell">mat.</td>
+            <td class="after-cell">cloud</td>
+            <td class="before-cell">mat.</td>
+            <td class="after-cell">cloud</td>
+          </tr>
+          <tr>
+            <td class="prompt-cell">the king sat on the</td>
+            <td class="before-cell">throne</td>
+            <td class="after-cell">dragon</td>
+            <td class="before-cell">throne</td>
+            <td class="after-cell">dragon</td>
+          </tr>
+          <tr>
+            <td class="prompt-cell">the robot sat on the</td>
+            <td class="before-cell">floor,</td>
+            <td class="after-cell">rainbow</td>
+            <td class="before-cell">floor.</td>
+            <td class="after-cell">cloud</td>
+          </tr>
+          <tr class="unseen">
+            <td class="prompt-cell">the alien sat on the</td>
+            <td class="before-cell">porch.</td>
+            <td class="after-cell">rainbow</td>
+            <td class="before-cell">grass.</td>
+            <td class="after-cell">satellite</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="padding:20px;background:rgba(0,0,0,0.3);border-radius:6px;font-size:15px;line-height:1.7;color:var(--ink-dim);margin-top:24px">
+        Both BEFORE columns: boring English. Both AFTER columns: wild fantasy. <b style="color:var(--ink)">QLoRA matches LoRA in quality despite using half the memory.</b> That's the whole story.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== KEY TAKEAWAYS ===== -->
+<section class="stage" style="--stage-color: var(--s1)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big" style="background:linear-gradient(180deg,var(--s1),var(--s4),var(--code-accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">∞</div>
+      <div>
+        <h2 class="stage-title">Three lessons.</h2>
+        <p class="stage-kicker">If your students remember nothing else from this poster, make sure they remember this.</p>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px">
+      <div class="card" style="border-top:3px solid var(--dim-R)">
+        <div style="font-family:'Fraunces',serif;font-size:48px;font-weight:800;color:var(--dim-R);line-height:1;margin-bottom:16px">01</div>
+        <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700;margin-bottom:12px">LoRA freezes the base.</div>
+        <div style="font-size:14px;color:var(--ink-dim);line-height:1.7">Add tiny A·B adapter pairs on Q and V. Train only those. 0.07% of the parameters do the work of teaching the model a new task.</div>
+      </div>
+      <div class="card" style="border-top:3px solid var(--s4)">
+        <div style="font-family:'Fraunces',serif;font-size:48px;font-weight:800;color:#f0abfc;line-height:1;margin-bottom:16px">02</div>
+        <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700;margin-bottom:12px">QLoRA compresses the frozen base.</div>
+        <div style="font-size:14px;color:var(--ink-dim);line-height:1.7">If we're never updating it, store it in 4 bits instead of 16. NF4 places the 16 quantization values where weights actually cluster. 4× compression, almost no quality loss.</div>
+      </div>
+      <div class="card" style="border-top:3px solid var(--s8)">
+        <div style="font-family:'Fraunces',serif;font-size:48px;font-weight:800;color:var(--s8);line-height:1;margin-bottom:16px">03</div>
+        <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700;margin-bottom:12px">Adapters are tiny and swappable.</div>
+        <div style="font-size:14px;color:var(--ink-dim);line-height:1.7">2.86 MB per adapter vs 2 GB for the base. Host one base model, ship dozens of skill packs. This is how production LLM serving works at scale.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="container">
+    <p class="quote">"Don't rewrite the book. Stick small notes on the important pages.<br>That's LoRA. Compress the book to 4-bit too. That's QLoRA."</p>
+    <div class="sig">Fine-tuning Gemma · A visual lesson · For the curious · Part 2 of 2</div>
+  </div>
+</footer>
+
+<script>
+// ===== Toggle code panels =====
+function toggleCode(id) {
+  const panel = document.getElementById(id);
+  const btn = panel.previousElementSibling;
+  const isOpen = panel.classList.toggle('open');
+  if (isOpen) {
+    btn.innerHTML = '<span class="icon">×</span> Hide code';
+  } else {
+    btn.innerHTML = '<span class="icon">&lt;/&gt;</span> Show code';
+  }
+}
+
+// ===== Tower stack (Stage 1) =====
+(() => {
+  const wrap = document.getElementById('tower-stack');
+  const colors = ['#4338ca','#6d28d9','#9333ea','#c026d3','#db2777','#e11d48','#ea580c','#f59e0b'];
+  for (let i = 0; i < 32; i++) {
+    const block = document.createElement('div');
+    block.className = 'tower-block';
+    const c = colors[Math.floor((i / 32) * colors.length)];
+    block.style.background = `linear-gradient(90deg, ${c}aa, ${c}55)`;
+    block.style.borderLeft = `2px solid ${c}`;
+    block.style.opacity = (0.4 + (i / 32) * 0.5).toFixed(2);
+    wrap.appendChild(block);
+  }
+})();
+
+// ===== Dataset grid (Stage 3) =====
+(() => {
+  const sentences = [
+    ['cat', 'sat on the', 'moon'],
+    ['cat', 'sat on the', 'dragon'],
+    ['cat', 'sat on the', 'volcano'],
+    ['cat', 'napped on the', 'rainbow'],
+    ['dog', 'sat on the', 'rocket'],
+    ['dog', 'sat on the', 'throne'],
+    ['dog', 'sat on the', 'cloud'],
+    ['bird', 'sat on the', 'cloud'],
+    ['bird', 'sat on the', 'rainbow'],
+    ['bird', 'sat on the', 'satellite'],
+    ['man', 'sat on the', 'moon'],
+    ['man', 'sat on the', 'lightning'],
+    ['man', 'sat on the', 'dragon'],
+    ['woman', 'sat on the', 'mountain'],
+    ['woman', 'sat on the', 'diamond'],
+    ['woman', 'sat on the', 'comet'],
+    ['king', 'sat on the', 'volcano'],
+    ['king', 'sat on the', 'dragon'],
+    ['queen', 'sat on the', 'comet'],
+    ['queen', 'sat on the', 'rainbow'],
+    ['child', 'sat on the', 'unicorn'],
+    ['child', 'sat on the', 'airplane'],
+    ['monkey', 'sat on the', 'satellite'],
+    ['monkey', 'sat on the', 'pyramid'],
+    ['elephant', 'sat on the', 'cake'],
+    ['elephant', 'sat on the', 'iceberg'],
+    ['lion', 'sat on the', 'desert'],
+    ['lion', 'sat on the', 'cactus'],
+    ['fish', 'sat on the', 'fire'],
+    ['snake', 'sat on the', 'keyboard'],
+    ['snake', 'sat on the', 'laptop'],
+    ['robot', 'sat on the', 'rainbow'],
+    ['robot', 'sat on the', 'cloud'],
+    ['wizard', 'sat on the', 'dragon'],
+    ['wizard', 'sat on the', 'comet'],
+    ['ninja', 'sat on the', 'volcano'],
+  ];
+  const grid = document.getElementById('data-grid');
+  const subjClass = (s) => {
+    if (s === 'cat') return 'subj-cat';
+    if (s === 'dog') return 'subj-dog';
+    if (s === 'bird') return 'subj-bird';
+    return 'subj-other';
+  };
+  sentences.forEach(([s, m, e]) => {
+    const cell = document.createElement('div');
+    cell.className = 'data-cell';
+    cell.innerHTML = `the <span class="${subjClass(s)}">${s}</span> ${m} <span class="surprise">${e}</span>`;
+    grid.appendChild(cell);
+  });
+})();
+
+// ===== Loss curve (Stage 10) =====
+(() => {
+  // Real values from the notebook
+  const realLosses = [7.86, 7.67, 7.01, 6.08, 5.28, 4.47, 3.83, 3.30, 2.88, 2.50, 2.35, 2.26, 2.23, 2.15, 2.11, 2.05, 2.03, 2.03, 2.02, 2.01];
+  const W = 800, H = 160;
+  const yMax = 8.5;
+  const N = realLosses.length;
+  const path = realLosses.map((y, i) => {
+    const x = (i / (N - 1)) * (W - 40) + 20;
+    const py = H - (y / yMax) * (H - 40) - 16;
+    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${py.toFixed(1)}`;
+  }).join(' ');
+  const fillPath = path + ` L ${W - 20} ${H - 16} L 20 ${H - 16} Z`;
+  document.getElementById('loraLossLine').setAttribute('d', path);
+  document.getElementById('loraLossPath').setAttribute('d', fillPath);
+})();
+
+// ===== NF4 bell curve viz (Stage 14) =====
+(() => {
+  const W = 800, H = 180;
+  const cx = W / 2;
+  const sigma = 120;
+  const peak = 120;
+
+  // Bell curve path
+  const points = [];
+  for (let x = 20; x <= W - 20; x += 4) {
+    const z = (x - cx) / sigma;
+    const y = peak * Math.exp(-0.5 * z * z);
+    points.push([x, 160 - y]);
+  }
+  const bellD = `M 20 160 ` + points.map(([x, y]) => `L ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ') + ` L ${W - 20} 160 Z`;
+  document.getElementById('bellPath').setAttribute('d', bellD);
+
+  // Uniform FP4 markers — evenly spaced (16 of them)
+  const uniform = document.getElementById('uniformMarkers');
+  for (let i = 0; i < 16; i++) {
+    const x = 20 + (i / 15) * (W - 40);
+    const m = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    m.setAttribute('x1', x);
+    m.setAttribute('x2', x);
+    m.setAttribute('y1', 160);
+    m.setAttribute('y2', 168);
+    m.setAttribute('stroke', '#fca5a5');
+    m.setAttribute('stroke-width', '2');
+    uniform.appendChild(m);
+  }
+
+  // NF4 markers — clustered near zero (use inverse normal CDF spacing approximation)
+  const nf4 = document.getElementById('nf4Markers');
+  // Quantile positions for normal distribution (k/17 for k=1..16)
+  const erfInv = (x) => {
+    // Approximation
+    const a = 0.147;
+    const ln = Math.log(1 - x * x);
+    const t1 = 2 / (Math.PI * a) + ln / 2;
+    return Math.sign(x) * Math.sqrt(Math.sqrt(t1 * t1 - ln / a) - t1);
+  };
+  for (let k = 1; k <= 16; k++) {
+    const p = k / 17;
+    const z = erfInv(2 * p - 1) * Math.sqrt(2);
+    // Map z to x with reasonable range
+    const x = cx + (z / 3) * (W / 2 - 30);
+    const m = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    m.setAttribute('x1', x);
+    m.setAttribute('x2', x);
+    m.setAttribute('y1', 152);
+    m.setAttribute('y2', 160);
+    m.setAttribute('stroke', '#34d399');
+    m.setAttribute('stroke-width', '2.5');
+    nf4.appendChild(m);
+  }
+})();
+</script>
+
+</body>
+</html>

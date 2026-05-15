@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Observability · LangSmith + Helicone + Grafana · A Visual Lesson</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: #0a0a14;
+  --bg-2: #11111f;
+  --ink: #f4f1ea;
+  --ink-dim: #a8a3b8;
+  --ink-faint: #5a5670;
+
+  --s1: #4338ca;
+  --s2: #6d28d9;
+  --s3: #9333ea;
+  --s4: #c026d3;
+  --s5: #db2777;
+  --s6: #e11d48;
+  --s7: #ea580c;
+  --s8: #f59e0b;
+
+  --langsmith: #34d399;
+  --helicone: #fb923c;
+  --grafana: #60a5fa;
+  --vocab: #facc15;
+  --warn: #ef4444;
+
+  --card-bg: rgba(255,255,255,0.03);
+  --card-border: rgba(255,255,255,0.08);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family: 'Inter Tight', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.6;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse at top, rgba(67,56,202,0.18), transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(234,88,12,0.10), transparent 50%);
+  background-attachment: fixed;
+}
+
+body::before{
+  content:'';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+.container{
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 32px;
+  position: relative;
+  z-index: 2;
+}
+
+.display{
+  font-family: 'Fraunces', serif;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+.label{
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.mono{font-family: 'JetBrains Mono', monospace;}
+
+.hero{
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 80px 0 60px;
+  position: relative;
+}
+
+.hero .stage-num{
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 14px;
+  color: var(--ink-faint);
+  margin-bottom: 24px;
+}
+
+.hero h1{
+  font-size: clamp(48px, 9vw, 124px);
+  margin-bottom: 28px;
+  background: linear-gradient(135deg, var(--s1) 0%, var(--s4) 45%, var(--s7) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero h1 em{
+  font-style: italic;
+  font-weight: 300;
+  background: none;
+  -webkit-text-fill-color: var(--ink);
+  color: var(--ink);
+}
+
+.hero .sub{
+  font-size: clamp(18px, 2.2vw, 24px);
+  max-width: 760px;
+  color: var(--ink-dim);
+  margin-bottom: 40px;
+  font-weight: 300;
+}
+
+.stats{
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  max-width: 980px;
+  margin-bottom: 32px;
+}
+
+.stat{
+  border-left: 2px solid var(--card-border);
+  padding-left: 16px;
+}
+
+.stat .num{
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 36px;
+  letter-spacing: -0.03em;
+}
+
+.jump-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.jump{
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  text-decoration: none;
+  color: var(--ink);
+  background: rgba(255,255,255,0.03);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.jump:hover{
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.06);
+}
+
+.jump.langsmith:hover{ border-color: rgba(52,211,153,0.5); }
+.jump.helicone:hover{ border-color: rgba(251,146,60,0.5); }
+.jump.grafana:hover{ border-color: rgba(96,165,250,0.5); }
+
+.scroll-hint{
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  animation: bob 2s ease-in-out infinite;
+}
+
+@keyframes bob{
+  0%,100%{ transform: translate(-50%, 0); }
+  50%{ transform: translate(-50%, 8px); }
+}
+
+.stage{
+  padding: 100px 0;
+  border-top: 1px solid var(--card-border);
+}
+
+.stage-header{
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 24px;
+  margin-bottom: 56px;
+  align-items: start;
+}
+
+.stage-num-big{
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 64px;
+  line-height: 1;
+  background: var(--stage-color, var(--s1));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.stage-title{
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: clamp(32px, 5vw, 56px);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin-bottom: 12px;
+}
+
+.stage-kicker{
+  font-size: 17px;
+  color: var(--ink-dim);
+  font-weight: 300;
+  max-width: 800px;
+}
+
+.grid-2,
+.grid-3,
+.grid-4{
+  display: grid;
+  gap: 24px;
+}
+
+.grid-2{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.card{
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 28px;
+  backdrop-filter: blur(10px);
+}
+
+.card.accent{
+  border-left: 3px solid var(--stage-color, var(--s1));
+}
+
+.card h3{
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  line-height: 1.1;
+  margin-bottom: 14px;
+}
+
+.card p + p{ margin-top: 12px; }
+
+.small-title{
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-bottom: 12px;
+}
+
+.problem-strip{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.chip{
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.04);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+.flow{
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.flow-step{
+  padding: 20px;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.025);
+}
+
+.flow-step strong{
+  display: block;
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.flow-arrow{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  font-size: 24px;
+}
+
+.vocab-card{
+  background: rgba(250,204,21,0.06);
+  border: 1px solid rgba(250,204,21,0.18);
+}
+
+.term{
+  padding: 18px 0;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.term:first-child{ border-top: 0; padding-top: 0; }
+
+.term-name{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--vocab);
+  margin-bottom: 8px;
+}
+
+.term p{
+  color: var(--ink-dim);
+}
+
+.term p strong{
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.compare{
+  overflow-x: auto;
+}
+
+table{
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+th, td{
+  padding: 16px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--card-border);
+  vertical-align: top;
+}
+
+th{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.callout{
+  padding: 22px 24px;
+  border-left: 3px solid var(--stage-color, var(--s1));
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+}
+
+.callout strong{
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.project-map{
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+}
+
+.path{
+  padding: 14px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.02);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.foot{
+  padding: 80px 0 100px;
+  color: var(--ink-faint);
+  font-size: 14px;
+}
+
+@media (max-width: 980px){
+  .stats,
+  .problem-strip,
+  .grid-3,
+  .grid-4,
+  .flow,
+  .project-map{
+    grid-template-columns: 1fr;
+  }
+
+  .grid-2{
+    grid-template-columns: 1fr;
+  }
+
+  .flow-arrow{
+    display: none;
+  }
+
+  .stage-header{
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 720px){
+  .container{ padding: 0 20px; }
+  .stats{ grid-template-columns: repeat(2, 1fr); }
+  .hero{ min-height: auto; padding-top: 110px; }
+}
+</style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <div class="stage-num">Visual lesson 03</div>
+      <h1 class="display">Observability.<br><em>How do you see<br>an AI system think?</em></h1>
+      <p class="sub">
+        Once you have multiple agents, tool calls, API requests, and LLM bills, the hard part is no longer only
+        <em>building</em> the system. The hard part is <em>seeing</em> it clearly. This page explains the three lenses used in this project:
+        <span style="color:var(--langsmith)">LangSmith</span>,
+        <span style="color:var(--helicone)">Helicone</span>, and
+        <span style="color:var(--grafana)">Grafana</span>.
+      </p>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="num">3</div>
+          <div class="label">tools, not replacements</div>
+        </div>
+        <div class="stat">
+          <div class="num">1</div>
+          <div class="label">system, viewed from different angles</div>
+        </div>
+        <div class="stat">
+          <div class="num">logs</div>
+          <div class="label">what happened</div>
+        </div>
+        <div class="stat">
+          <div class="num">traces</div>
+          <div class="label">how it unfolded</div>
+        </div>
+      </div>
+
+      <div class="jump-row">
+        <a class="jump langsmith" href="#langsmith">LangSmith</a>
+        <a class="jump helicone" href="#helicone">Helicone</a>
+        <a class="jump grafana" href="#grafana">Grafana</a>
+        <a class="jump" href="#compare">Compare Them</a>
+      </div>
+
+      <div class="scroll-hint">Scroll</div>
+    </section>
+
+    <section class="stage" style="--stage-color:linear-gradient(180deg,var(--s2),var(--s7));">
+      <div class="stage-header">
+        <div class="stage-num-big">01</div>
+        <div>
+          <h2 class="stage-title">The problem.</h2>
+          <p class="stage-kicker">
+            A student asks one question. Under the hood, many things happen: planning, searching, reading, writing,
+            critiquing, API calls, request logging, retries, timing, and cost. If something goes wrong, where do you look?
+          </p>
+        </div>
+      </div>
+
+      <div class="problem-strip">
+        <div class="card accent">
+          <div class="small-title">Without observability</div>
+          <h3>The system feels magical.</h3>
+          <p>You only see the final answer. If it is wrong, slow, or expensive, you are left guessing.</p>
+        </div>
+        <div class="card accent">
+          <div class="small-title">What students usually try first</div>
+          <h3>Just print everything.</h3>
+          <p>That works for tiny scripts. It breaks down once many components are active at the same time.</p>
+        </div>
+        <div class="card accent">
+          <div class="small-title">What observability gives you</div>
+          <h3>A way to inspect reality.</h3>
+          <p>Not one giant mess of text. Different views for workflow, LLM spending, and system health.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="stage" style="--stage-color:linear-gradient(180deg,var(--s1),var(--s5));">
+      <div class="stage-header">
+        <div class="stage-num-big">02</div>
+        <div>
+          <h2 class="stage-title">One request. Three lenses.</h2>
+          <p class="stage-kicker">
+            The same user request can be observed at different layers. That is why this project uses three tools instead of forcing one tool to do everything.
+          </p>
+        </div>
+      </div>
+
+      <div class="card accent" style="margin-bottom:24px">
+        <div class="flow">
+          <div class="flow-step">
+            <strong>User</strong>
+            A student sends one research question.
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <strong>LangSmith</strong>
+            Shows the agent workflow and tool execution.
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <strong>Helicone</strong>
+            Shows LLM request cost, latency, and caching.
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <div class="chip">Question answered</div>
+          <h3>What did the agents do?</h3>
+          <p>Use LangSmith when you want to inspect reasoning steps, tool calls, and graph execution.</p>
+        </div>
+        <div class="card">
+          <div class="chip">Question answered</div>
+          <h3>Which LLM calls cost money?</h3>
+          <p>Use Helicone when you want to watch latency, price, cache hits, and per-agent usage.</p>
+        </div>
+        <div class="card">
+          <div class="chip">Question answered</div>
+          <h3>Is the API healthy?</h3>
+          <p>Use Grafana when you want logs, metrics, request timings, and operational health.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="langsmith" class="stage" style="--stage-color:linear-gradient(180deg,#10b981,#34d399);">
+      <div class="stage-header">
+        <div class="stage-num-big">03</div>
+        <div>
+          <h2 class="stage-title">LangSmith.<br>See the workflow.</h2>
+          <p class="stage-kicker">
+            In this project, LangSmith is attached to the agents and tools. It is the place where students can inspect
+            the life of a run: planner, searcher, reader, writer, critic, and the loops between them.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:24px">
+        <div class="card accent">
+          <div class="small-title">What it is trying to solve</div>
+          <h3>Agent systems are hard to debug.</h3>
+          <p>If the final answer is weak, the real question is not just “what was the answer?” It is “which step failed?” Did the planner create weak queries? Did search return poor sources? Did the writer ignore facts? LangSmith gives you that step-by-step picture.</p>
+        </div>
+        <div class="card accent">
+          <div class="small-title">How it is used here</div>
+          <h3>Traceable agents and tools.</h3>
+          <p>Each agent function is decorated with <span class="mono">@traceable</span>, and the search tool is also traced. That means each run can be opened like a tree instead of a blob of logs.</p>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:24px">
+        <div class="card">
+          <div class="small-title">Students should notice</div>
+          <h3>Runs</h3>
+          <p>A <strong>run</strong> is one execution of something. One whole research request is a big run. Inside it are smaller runs for agents and tools.</p>
+        </div>
+        <div class="card">
+          <div class="small-title">Students should notice</div>
+          <h3>Trace</h3>
+          <p>A <strong>trace</strong> is the full journey of one request. Think of it like a timeline plus a family tree: what happened, and which step created which child step.</p>
+        </div>
+        <div class="card">
+          <div class="small-title">Students should notice</div>
+          <h3>Metadata</h3>
+          <p><strong>Metadata</strong> is extra context attached to a run, like the original question or selected team. It helps you filter and understand runs later.</p>
+        </div>
+      </div>
+
+      <div class="card vocab-card">
+        <div class="small-title">Vocabulary, in plain English</div>
+        <div class="term">
+          <div class="term-name">trace</div>
+          <p><strong>Meaning:</strong> a step-by-step record of a request moving through the system.</p>
+          <p><strong>Why it is used:</strong> because a final answer alone hides the path that produced it.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">run</div>
+          <p><strong>Meaning:</strong> one execution of a task, function, agent, or tool.</p>
+          <p><strong>Why it is used:</strong> because each part of the system needs to be inspectable on its own.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">tool call</div>
+          <p><strong>Meaning:</strong> when an agent uses an outside capability, like web search.</p>
+          <p><strong>Why it is used:</strong> because agents often fail due to bad tool usage, not just bad writing.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">evaluation</div>
+          <p><strong>Meaning:</strong> checking whether the system behaved well.</p>
+          <p><strong>Why it is used:</strong> because “it ran” is not the same as “it worked correctly.”</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="helicone" class="stage" style="--stage-color:linear-gradient(180deg,#ea580c,#fb923c);">
+      <div class="stage-header">
+        <div class="stage-num-big">04</div>
+        <div>
+          <h2 class="stage-title">Helicone.<br>See the LLM traffic.</h2>
+          <p class="stage-kicker">
+            LangSmith tells you what the workflow did. Helicone tells you what happened specifically at the LLM API layer:
+            cost, speed, cache behavior, and request-level analytics.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:24px">
+        <div class="card accent">
+          <div class="small-title">What it is trying to solve</div>
+          <h3>LLM calls are expensive and easy to ignore.</h3>
+          <p>As soon as you have multiple agents, you no longer have one model call. You may have many. Some are fast, some are slow, some are repeated, and all of them cost money. Helicone makes those calls visible.</p>
+        </div>
+        <div class="card accent">
+          <div class="small-title">How it is used here</div>
+          <h3>A transparent proxy.</h3>
+          <p>The project routes <span class="mono">ChatOpenAI</span> requests through the Helicone base URL. That means the app still behaves like an OpenAI app, but Helicone sits in the middle and records what passes through.</p>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:24px">
+        <div class="card">
+          <div class="small-title">Core idea</div>
+          <h3>Proxy</h3>
+          <p>A <strong>proxy</strong> is a middle layer. Instead of your app talking straight to OpenAI, it talks to Helicone first, and Helicone forwards the request onward.</p>
+        </div>
+        <div class="card">
+          <div class="small-title">Core idea</div>
+          <h3>Caching</h3>
+          <p>A <strong>cache</strong> stores a previous result so the same request can be served faster later. It can reduce both latency and cost when prompts repeat exactly.</p>
+        </div>
+        <div class="card">
+          <div class="small-title">Core idea</div>
+          <h3>Per-agent properties</h3>
+          <p>Custom request headers let this project label calls as Planner, Writer, Critic, and so on. That makes cost analysis much more meaningful for students.</p>
+        </div>
+      </div>
+
+      <div class="card vocab-card">
+        <div class="small-title">Vocabulary, in plain English</div>
+        <div class="term">
+          <div class="term-name">proxy</div>
+          <p><strong>Meaning:</strong> a middle service that receives your request before the final destination does.</p>
+          <p><strong>Why it is used:</strong> because it can measure, log, and improve requests without forcing a full rewrite of your app.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">request headers</div>
+          <p><strong>Meaning:</strong> little pieces of extra information sent along with a request.</p>
+          <p><strong>Why it is used:</strong> to attach labels like which agent made the call, or whether caching should be enabled.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">latency</div>
+          <p><strong>Meaning:</strong> how long a request takes from start to finish.</p>
+          <p><strong>Why it is used:</strong> because a good answer that takes too long still feels broken to users.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">cache hit</div>
+          <p><strong>Meaning:</strong> the system found a saved answer instead of recomputing it.</p>
+          <p><strong>Why it is used:</strong> because repeated prompts should not always cost full price.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="grafana" class="stage" style="--stage-color:linear-gradient(180deg,#3b82f6,#60a5fa);">
+      <div class="stage-header">
+        <div class="stage-num-big">05</div>
+        <div>
+          <h2 class="stage-title">Grafana.<br>See the system health.</h2>
+          <p class="stage-kicker">
+            In this project, Grafana is the wider operations view. It is not primarily about the inner thinking of agents.
+            It is about logs, metrics, API timing, and the health of the service around the agents.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:24px">
+        <div class="card accent">
+          <div class="small-title">What it is trying to solve</div>
+          <h3>Production systems fail in boring ways.</h3>
+          <p>Sometimes the model is fine. The real issue is that the API got slow, requests piled up, errors increased, or a payload caused a failure. Grafana helps you notice those operational problems.</p>
+        </div>
+        <div class="card accent">
+          <div class="small-title">How it is used here</div>
+          <h3>Loki for logs, Prometheus for metrics.</h3>
+          <p>The project logs incoming and outgoing API traffic to Loki, and pushes metrics through OpenTelemetry into Prometheus-compatible storage for dashboards and trend watching.</p>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:24px">
+        <div class="card">
+          <div class="small-title">The easiest distinction</div>
+          <h3>Log</h3>
+          <p>A <strong>log</strong> is a text record of something that happened, like an incoming request or an error message.</p>
+        </div>
+        <div class="card">
+          <div class="small-title">The easiest distinction</div>
+          <h3>Metric</h3>
+          <p>A <strong>metric</strong> is a number measured over time, like request count, latency, or error rate.</p>
+        </div>
+        <div class="card">
+          <div class="small-title">The easiest distinction</div>
+          <h3>Dashboard</h3>
+          <p>A <strong>dashboard</strong> is the visual place where those numbers and logs are assembled into something humans can read quickly.</p>
+        </div>
+      </div>
+
+      <div class="card vocab-card" style="margin-bottom:24px">
+        <div class="small-title">Vocabulary, in plain English</div>
+        <div class="term">
+          <div class="term-name">Grafana</div>
+          <p><strong>Meaning:</strong> the place where you view and explore observability data.</p>
+          <p><strong>Why it is used:</strong> because raw metrics and raw logs are hard to understand without dashboards and queries.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">Loki</div>
+          <p><strong>Meaning:</strong> the log system used with Grafana.</p>
+          <p><strong>Why it is used:</strong> to store and search text events like incoming requests, outgoing responses, and errors.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">Prometheus</div>
+          <p><strong>Meaning:</strong> the metrics system used for time-series numbers.</p>
+          <p><strong>Why it is used:</strong> because system health is often easier to understand as changing numbers over time than as text paragraphs.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">OpenTelemetry</div>
+          <p><strong>Meaning:</strong> a common instrumentation standard for collecting observability data.</p>
+          <p><strong>Why it is used:</strong> so apps can emit metrics and telemetry in a standard way instead of inventing everything from scratch.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">middleware</div>
+          <p><strong>Meaning:</strong> code that sits in the path between request and response.</p>
+          <p><strong>Why it is used:</strong> because it is a natural place to measure duration and log payloads for every API call.</p>
+        </div>
+        <div class="term">
+          <div class="term-name">counter</div>
+          <p><strong>Meaning:</strong> a metric that only goes up, like total LLM calls or total requests.</p>
+          <p><strong>Why it is used:</strong> because totals are useful for traffic, usage, and throughput trends.</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Short version</strong>
+        If LangSmith tells you <em>how the research pipeline behaved</em>, Grafana tells you <em>how the service itself behaved</em>.
+      </div>
+    </section>
+
+    <section id="compare" class="stage" style="--stage-color:linear-gradient(180deg,var(--s4),var(--s8));">
+      <div class="stage-header">
+        <div class="stage-num-big">06</div>
+        <div>
+          <h2 class="stage-title">Which tool answers which question?</h2>
+          <p class="stage-kicker">
+            Students often confuse these tools because all of them feel like “monitoring.” The cleanest way to separate them is by the question you are asking.
+          </p>
+        </div>
+      </div>
+
+      <div class="card compare">
+        <table>
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th>Best Tool</th>
+              <th>Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Which agent step failed?</td>
+              <td>LangSmith</td>
+              <td>It shows the graph-like execution trace of agents and tools.</td>
+            </tr>
+            <tr>
+              <td>Why is the app getting expensive?</td>
+              <td>Helicone</td>
+              <td>It sits on the LLM request path and measures cost per request and per agent.</td>
+            </tr>
+            <tr>
+              <td>Why is the API getting slow?</td>
+              <td>Grafana</td>
+              <td>It tracks request timing, logs, and operational metrics.</td>
+            </tr>
+            <tr>
+              <td>Did the writer or critic call the model more than expected?</td>
+              <td>Helicone</td>
+              <td>Per-agent labeling makes those costs and patterns visible.</td>
+            </tr>
+            <tr>
+              <td>What exact request/response payload moved through the API?</td>
+              <td>Grafana + Loki</td>
+              <td>Loki is built for searching log events and payload text.</td>
+            </tr>
+            <tr>
+              <td>What happened across the full research run?</td>
+              <td>LangSmith</td>
+              <td>It keeps the run structure connected from parent to child steps.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="stage" style="--stage-color:linear-gradient(180deg,var(--s1),var(--s7));">
+      <div class="stage-header">
+        <div class="stage-num-big">07</div>
+        <div>
+          <h2 class="stage-title">How this project wires them together.</h2>
+          <p class="stage-kicker">
+            These tools are not abstract ideas here. They are attached to specific places in the codebase, each at a different layer.
+          </p>
+        </div>
+      </div>
+
+      <div class="project-map">
+        <div class="card accent">
+          <div class="small-title">Implementation map</div>
+          <h3>Three layers, three attachment points.</h3>
+          <p>LangSmith is attached where agents and tools run. Helicone is attached where LLM calls are made. Grafana is attached where the API receives traffic and emits metrics.</p>
+          <p>That separation is useful for teaching because students can see that “observability” is not one giant feature. It is several carefully chosen observation points.</p>
+        </div>
+        <div class="grid-3">
+          <div class="path">LangSmith<br><br>agents/*.py<br>tools/search.py<br>api.py metadata</div>
+          <div class="path">Helicone<br><br>backend/llm.py<br>request headers<br>proxy base URL</div>
+          <div class="path">Grafana<br><br>logger/loki.py<br>logger/middleware.py<br>logger/prometheus.py</div>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-top:24px">
+        <div class="card">
+          <div class="small-title">Main teaching lesson</div>
+          <h3>Observe the workflow.</h3>
+          <p>Students learn how a multi-agent graph actually executes, not just what answer popped out at the end.</p>
+        </div>
+        <div class="card">
+          <div class="small-title">Main teaching lesson</div>
+          <h3>Observe the cost.</h3>
+          <p>Students see that LLM systems are not only about correctness. They are also about latency and spend.</p>
+        </div>
+        <div class="card">
+          <div class="small-title">Main teaching lesson</div>
+          <h3>Observe the service.</h3>
+          <p>Students see that real systems need health monitoring around the AI layer, not just inside it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="foot">
+      Observability is the practice of turning invisible system behavior into something humans can inspect. In this project:
+      LangSmith explains the workflow, Helicone explains the LLM traffic, and Grafana explains the system health.
+    </section>
+  </div>
+</body>
+</html>
