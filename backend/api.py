@@ -6,20 +6,31 @@ No streaming, no SSE, no approve endpoint.
 
 from __future__ import annotations
 
+import os
+import time
+# Removed unused standard imports
+from pathlib import Path
+
 from dotenv import load_dotenv
 load_dotenv()  # Load .env BEFORE any LangChain/LangSmith imports
-
-import time
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+# Removed unused starlette imports
 
 from backend.orchestrator import compile_graph, create_initial_state
 
+# --- Observability Setup ---
+from logger.loki import logger
+from logger.prometheus import setup_prometheus_metrics, llm_calls_counter, iterations_counter, sources_counter
+from logger.middleware import LoggingMiddleware
+
 app = FastAPI(title="Multi-Agent Research System")
+setup_prometheus_metrics(app)
+
+app.add_middleware(LoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,6 +60,8 @@ class ResearchRequest(BaseModel):
 
 @app.post("/research")
 async def research(req: ResearchRequest):
+    logger.info(f"Incoming Payload: {req.model_dump_json()}")
+    logger.info(f"Starting research pipeline for question: {req.question}")
     print(f"\n{'='*60}")
     print(f"New research request: {req.question}")
     print(f"{'='*60}")
@@ -56,23 +69,35 @@ async def research(req: ResearchRequest):
     initial_state, team = create_initial_state(req.question, req.max_iterations)
     graph = compile_graph(team)
 
+    logger.info(f"Compiled team: {', '.join(team)}")
     print(f"Team: {', '.join(team)}")
     print(f"Starting pipeline...\n")
 
     start_time = time.time()
-    final_state = graph.invoke(
-        initial_state,
-        config={
-            "recursion_limit": 50,
-            "metadata": {
-                "question": req.question,
-                "team": team,
+    try:
+        final_state = graph.invoke(
+            initial_state,
+            config={
+                "recursion_limit": 50,
+                "metadata": {
+                    "question": req.question,
+                    "team": team,
+                },
             },
-        },
-    )
+        )
+    except Exception as e:
+        logger.error(f"Graph execution failed with error: {str(e)}", exc_info=True)
+        raise e
+        
     final_state["duration_seconds"] = time.time() - start_time
     final_state["final_answer"] = final_state.get("answer", "")
 
+    # Push Custom Metrics via OpenTelemetry
+    llm_calls_counter.add(final_state.get("llm_calls", 0))
+    iterations_counter.add(final_state.get("iterations", 0))
+    sources_counter.add(final_state.get("sources_count", 0))
+
+    logger.info(f"Research complete in {final_state['duration_seconds']:.1f}s")
     print(f"\nPipeline complete in {final_state['duration_seconds']:.1f}s")
     print(f"{'='*60}\n")
 
