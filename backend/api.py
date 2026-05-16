@@ -15,11 +15,13 @@ from dotenv import load_dotenv
 load_dotenv()  # Load .env BEFORE any LangChain/LangSmith imports
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 # Removed unused starlette imports
 
+from backend.guardrails.pipeline import input_guard, output_guard, is_safe
 from backend.orchestrator import compile_graph, create_initial_state
 
 # --- Observability Setup ---
@@ -66,6 +68,18 @@ async def research(req: ResearchRequest):
     print(f"New research request: {req.question}")
     print(f"{'='*60}")
 
+    is_allowed, msg = is_safe(input_guard, req.question)
+    if not is_allowed:
+        logger.warning(f"Input blocked by guardrails: {msg}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "input_blocked",
+                "message": msg,
+                "guardrails": {"allowed": False, "user_message": msg},
+            },
+        )
+
     initial_state, team = create_initial_state(req.question, req.max_iterations)
     graph = compile_graph(team)
 
@@ -90,7 +104,8 @@ async def research(req: ResearchRequest):
         raise e
         
     final_state["duration_seconds"] = time.time() - start_time
-    final_state["final_answer"] = final_state.get("answer", "")
+    is_allowed, msg = is_safe(output_guard, final_state.get("answer", ""))
+    final_state["final_answer"] = final_state.get("answer", "") if is_allowed else msg
 
     # Push Custom Metrics via OpenTelemetry
     llm_calls_counter.add(final_state.get("llm_calls", 0))
@@ -110,4 +125,8 @@ async def research(req: ResearchRequest):
         "sources_count": final_state.get("sources_count", 0),
         "duration_seconds": final_state.get("duration_seconds", 0),
         "was_sensitive": final_state.get("was_sensitive", False),
+        "guardrails": {
+            "input": {"allowed": True, "user_message": "OK"},
+            "output": {"allowed": is_allowed, "user_message": msg},
+        },
     }

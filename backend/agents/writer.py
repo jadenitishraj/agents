@@ -8,9 +8,9 @@ from __future__ import annotations
 from langsmith import traceable
 
 from backend.llm import call_llm
+from backend.content_policy.policy_loader import load_policy, wrap_user_input
 
 Source = dict[str, str]
-
 
 @traceable(name="writer_agent", run_type="chain")
 def writer_agent(
@@ -21,6 +21,7 @@ def writer_agent(
     critic_feedback: str = "",
 ) -> str:
     """Write a clear, well-structured answer (150-300 words) to the question."""
+    policy = load_policy()
     sources_text = "\n".join(
         f"- {s['title']} ({s['url']})" for s in sources[:8]
     )
@@ -35,15 +36,17 @@ def writer_agent(
     disclaimer_line = (
         f"Include this disclaimer at the end: {disclaimer}" if disclaimer else ""
     )
-    prompt = f"""Write a clear, well-structured answer (150-300 words) to the question.
+    prompt = f"""{policy}
+
+Write a clear, well-structured answer (150-300 words) to the question.
 Use the facts and cite sources where appropriate.
 {disclaimer_line}
 
-Question: {question}
+Question: {wrap_user_input(question)}
 
 Facts:
 {facts_text}
 
 Sources:
-{sources_text}{feedback_text}"""
+{wrap_user_input(sources_text)}{feedback_text}"""
     return call_llm(prompt, max_tokens=600, agent_name="Writer")

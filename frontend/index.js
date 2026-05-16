@@ -28,7 +28,16 @@ async function submitQuestion() {
             body: JSON.stringify({ question }),
         });
 
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        if (!res.ok) {
+            let message = `Server error: ${res.status}`;
+            try {
+                const errorData = await res.json();
+                message = errorData.message || message;
+            } catch {
+                // Keep the default message when the response is not JSON.
+            }
+            throw new Error(message);
+        }
         const data = await res.json();
 
         // Show team badges.
