@@ -5,7 +5,7 @@
 
 ## Description
 
-Implement robust input and output filtering for the LangGraph multi-agent application using Guardrails AI. This module will validate both user inputs and LLM outputs to prevent prompt injections, PII leaks, toxic language, and custom banned words. To maintain system stability, it will catch all validation exceptions and return safe, structured user-facing messages rather than crashing the orchestrator. 
+Implement robust input and output filtering for the LangGraph multi-agent application using Guardrails AI. This module will validate both user inputs and LLM outputs to prevent prompt injections, PII leaks, toxic language, and custom banned words. To maintain system stability, it will catch all validation exceptions and return safe, structured user-facing messages rather than crashing the orchestrator.
 
 **Strict Modularity Requirement:** The code inside the `backend/guardrails` directory must be highly modular. No single file should exceed 20 to 30 lines. The architecture will be divided into small, single-responsibility files (e.g., config, pipeline orchestrator, individual validators).
 
@@ -26,20 +26,20 @@ Implement robust input and output filtering for the LangGraph multi-agent applic
 
 ## Files Touched
 
-| File | Action | What Changed |
-|------|--------|-------------|
-| `backend/requirements.txt` | Modified | Add `guardrails-ai` package requirement |
-| `backend/guardrails/config.py` | Created | Severity mappings and configuration |
-| `backend/guardrails/validators.py` | Created | Base64, Custom Words, Regex logic |
-| `backend/guardrails/input_checks.py` | Created | Input filtering assembly |
-| `backend/guardrails/output_checks.py` | Created | Output filtering assembly |
-| `backend/guardrails/async_pipeline.py` | Created | Async wrapper functions |
-| `backend/guardrails/pipeline.py` | Created | Main `GuardrailPipeline` class |
-| `backend/guardrails/demo.py` | Created | Testing script |
-| `backend/guardrails/__init__.py` | Created | Exports the main pipeline class |
-| `backend/guardrails/models.py` | Created | Dataclasses for guardrail issues and results |
-| `backend/api.py` | Modified | Call guardrails before orchestration and before returning the answer |
-| `frontend/index.js` | Modified | Parse API error JSON and show guardrail block messages |
+| File                                   | Action   | What Changed                                                         |
+| -------------------------------------- | -------- | -------------------------------------------------------------------- |
+| `backend/requirements.txt`             | Modified | Add `guardrails-ai` package requirement                              |
+| `backend/guardrails/config.py`         | Created  | Severity mappings and configuration                                  |
+| `backend/guardrails/validators.py`     | Created  | Base64, Custom Words, Regex logic                                    |
+| `backend/guardrails/input_checks.py`   | Created  | Input filtering assembly                                             |
+| `backend/guardrails/output_checks.py`  | Created  | Output filtering assembly                                            |
+| `backend/guardrails/async_pipeline.py` | Created  | Async wrapper functions                                              |
+| `backend/guardrails/pipeline.py`       | Created  | Main `GuardrailPipeline` class                                       |
+| `backend/guardrails/demo.py`           | Created  | Testing script                                                       |
+| `backend/guardrails/__init__.py`       | Created  | Exports the main pipeline class                                      |
+| `backend/guardrails/models.py`         | Created  | Dataclasses for guardrail issues and results                         |
+| `backend/api.py`                       | Modified | Call guardrails before orchestration and before returning the answer |
+| `frontend/index.js`                    | Modified | Parse API error JSON and show guardrail block messages               |
 
 ## Notes
 

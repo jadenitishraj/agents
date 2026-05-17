@@ -36,6 +36,7 @@ def writer_agent(
     disclaimer_line = (
         f"Include this disclaimer at the end: {disclaimer}" if disclaimer else ""
     )
+
     prompt = f"""{policy}
 
 Write a clear, well-structured answer (150-300 words) to the question.
@@ -50,3 +51,30 @@ Facts:
 Sources:
 {wrap_user_input(sources_text)}{feedback_text}"""
     return call_llm(prompt, max_tokens=600, agent_name="Writer")
+    # Teaching note:
+    # This project builds the writer prompt as one explicit string so students can
+    # see the full prompt contract in a single place. LangGraph does not require
+    # any special prompt format here: each node is just Python code that receives
+    # state, prepares context, calls the model, and returns an output. In this
+    # node, the writer agent takes upstream state produced by other nodes
+    # (question, facts, sources, disclaimer, critic feedback), combines it with a
+    # reusable policy loaded from disk, and sends that final prompt to the LLM.
+    #
+    # The <user_input> wrapping is only a text delimiter. It is not a privileged
+    # LangChain or model-level role. We use it here because it makes the prompt
+    # easier to read in logs and easier for students to reason about: policy and
+    # instructions live outside the tags, while user-provided content is wrapped
+    # inside them.
+    #
+    # In industry, the more standard approach is usually:
+    # 1. put policy / safety / style rules in a system message
+    # 2. put the user question in a human message
+    # 3. pass facts and sources as structured context in additional messages or
+    #    template variables
+    # 4. keep prompt assembly separate from model invocation with
+    #    ChatPromptTemplate or equivalent abstractions
+    #
+    # That structured-message approach is generally more robust because it gives
+    # clearer separation between instruction layers. This teaching project keeps
+    # the prompt inline on purpose so students can inspect exactly what the node
+    # sends to the model without first learning the full prompt-template stack.
