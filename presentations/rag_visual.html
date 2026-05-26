@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Deep Dive into RAG · Visual Lesson</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a14;
+  --ink: #f4f1ea;
+  --ink-dim: #a8a3b8;
+  --ink-faint: #5a5670;
+
+  --s1: #0ea5e9; /* Sky Blue */
+  --s2: #10b981; /* Emerald */
+  --s3: #6366f1; /* Indigo */
+  --s4: #8b5cf6; /* Purple */
+
+  --card-bg: rgba(255,255,255,0.03);
+  --card-border: rgba(255,255,255,0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter Tight', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.7;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse at top, rgba(16,185,129,0.12), transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(99,102,241,0.08), transparent 50%);
+  background-attachment: fixed;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 32px;
+  position: relative;
+  z-index: 2;
+}
+
+/* === Typography === */
+.serif { font-family: 'Fraunces', serif; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* === Hero === */
+.hero {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 80px 0 60px;
+}
+.hero .stage-num {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink-faint);
+  margin-bottom: 24px;
+}
+.hero h1 {
+  font-size: clamp(40px, 7vw, 80px);
+  margin-bottom: 24px;
+  background: linear-gradient(135deg, var(--s1) 0%, var(--s2) 50%, var(--s3) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: 'Fraunces', serif;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+.hero .sub {
+  font-size: 20px;
+  color: var(--ink-dim);
+  margin-bottom: 30px;
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+/* === Tab bar === */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(10,10,20,0.9);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--card-border);
+  padding: 16px 0;
+}
+.tabs-inner {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.tab-btn {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 15px;
+  padding: 12px 24px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+.tab-btn:hover {
+  color: var(--ink);
+  background: rgba(255,255,255,0.05);
+}
+.tab-btn.active {
+  color: #fff;
+  border-color: var(--s2);
+  background: rgba(16,185,129,0.2);
+}
+
+/* === Tab panel === */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeIn 0.4s ease; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === Stages & Content === */
+.stage { padding: 60px 0; border-bottom: 1px solid var(--card-border); }
+.stage h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 36px;
+  margin-bottom: 24px;
+  color: var(--s1);
+  letter-spacing: -0.02em;
+}
+.stage h3 {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 40px 0 16px;
+  color: #fff;
+}
+.stage p {
+  font-size: 18px;
+  color: var(--ink-dim);
+  margin-bottom: 20px;
+  font-weight: 300;
+}
+.stage ul {
+  margin: 0 0 20px 24px;
+  color: var(--ink-dim);
+  font-size: 18px;
+  font-weight: 300;
+}
+.stage li { margin-bottom: 12px; }
+.stage strong { color: var(--ink); font-weight: 600; }
+
+/* === Metaphor Box === */
+.metaphor-box {
+  background: rgba(16,185,129,0.05);
+  border-left: 5px solid var(--s2);
+  padding: 30px;
+  border-radius: 0 12px 12px 0;
+  margin: 40px 0;
+}
+.metaphor-box h4 {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  color: #fff;
+  margin-bottom: 12px;
+}
+.metaphor-box p { font-size: 18px; color: var(--ink); margin-bottom: 0; }
+
+/* === Deep Dive Box === */
+.deep-dive {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 30px;
+  margin: 30px 0;
+}
+.deep-dive h4 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--s3);
+  letter-spacing: 0.1em;
+  margin-bottom: 16px;
+}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="container">
+    <div class="stage-num">The Deep Dive into Retrieval-Augmented Generation</div>
+    <h1>The Science of<br><em>RAG</em></h1>
+    <p class="sub">RAG is like giving an AI an open-book test. But what happens when the book has 10 million pages? We have to master the deep science of <strong>Chunking</strong> (slicing text), <strong>Storage</strong> (Vectors & Graphs), and <strong>Retrieval</strong> (finding the exact needle in the haystack).</p>
+  </div>
+</section>
+
+<div class="tabs">
+  <div class="container">
+    <div class="tabs-inner">
+      <button class="tab-btn active" data-tab="chunking">1. Chunking Strategies</button>
+      <button class="tab-btn" data-tab="storage">2. Vector vs. Graph Storage</button>
+      <button class="tab-btn" data-tab="retrieval">3. Advanced Retrieval (HyDE & BM25)</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 1: CHUNKING -->
+<div class="tab-panel active" id="panel-chunking">
+  <section class="stage">
+    <div class="container">
+      <h2 style="color: var(--s2)">The Art of Chunking</h2>
+      <p>Computers have a limited "context window" (working memory). You cannot feed a 500-page PDF into an LLM all at once. You must slice it into small "chunks". But <em>how</em> you slice it determines whether the AI gets brilliant context, or confusing garbage.</p>
+
+      <div class="metaphor-box" style="border-left-color: var(--s2);">
+        <h4>🍕 The Pizza Slicer Metaphor</h4>
+        <p>Imagine trying to slice a pizza while blindfolded. You might cut right through the middle of a pepperoni, or serve a slice that is 100% crust. If you cut a book strictly every 1,000 characters, you will slice a sentence in half, or separate a question from its answer. "Smart Chunking" is taking the blindfold off.</p>
+      </div>
+
+      <h3>1. Recursive Character Chunking (The Blunt Knife)</h3>
+      <p>This is the most basic method. The system tries to cut the text every 1,000 characters. If that cut lands in the middle of a word, it "recursively" backs up and tries to cut at a space, then at a period, then at a paragraph break.</p>
+      <ul>
+        <li><strong>When to use it:</strong> When you have massive walls of plain text (like an old novel) with no formatting.</li>
+        <li><strong>Why it fails:</strong> If you use this on computer code, it might slice a function in half, rendering the code completely useless.</li>
+      </ul>
+
+      <h3>2. Semantic Chunking (The Mind Reader)</h3>
+      <p>This is highly advanced. Instead of counting letters, the computer converts every sentence into a mathematical vector (a list of numbers). It compares Sentence 1 to Sentence 2. If the math says the topic suddenly changed, it makes a cut.</p>
+      <ul>
+        <li><strong>Analogy:</strong> Think of a movie. You don't pause a movie exactly every 60 seconds. You pause it when a scene ends and the camera cuts to a new location.</li>
+        <li><strong>When to use it:</strong> For meeting transcripts or messy interviews where people change topics randomly.</li>
+      </ul>
+
+      <h3>3. Hierarchical Chunking (The Table of Contents)</h3>
+      <p>Sometimes you need the big picture AND the tiny details. Hierarchical chunking creates a massive "Parent" chunk (e.g., 2,000 words summarizing a chapter) and links it to smaller "Child" chunks (e.g., 200 words explaining one specific paragraph).</p>
+      <ul>
+        <li><strong>When to use it:</strong> For dense legal documents or encyclopedias. If the user asks a broad question, the AI retrieves the Parent. If they ask a hyper-specific question, it retrieves the Child.</li>
+      </ul>
+
+      <div class="deep-dive">
+        <h4>In Our Code (parser.py)</h4>
+        <p>Before we chunk, our <strong>Classifier</strong> looks at the raw text. If it sees HTML tags, it uses an HTML chunker. If it sees markdown (<code>## Headers</code>), it uses a Markdown chunker to keep sections intact. It dynamically chooses the right knife for the job.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- TAB 2: STORAGE -->
+<div class="tab-panel" id="panel-storage">
+  <section class="stage">
+    <div class="container">
+      <h2 style="color: var(--s1)">Vector vs. Graph Storage</h2>
+      <p>Once you have thousands of chunks, where do you put them? A normal database (like an Excel spreadsheet) is useless here, because you can't ask a spreadsheet "Find me paragraphs that feel similar to sadness."</p>
+
+      <h3>1. Vector Databases (ChromaDB)</h3>
+      <p>To a computer, words mean nothing. To make a computer understand meaning, we convert chunks of text into <strong>Embeddings</strong>. An embedding is a list of coordinates (dimensions) that map exactly where a concept lives in a mathematical universe.</p>
+      
+      <div class="metaphor-box" style="border-left-color: var(--s1); background: rgba(14,165,233,0.05);">
+        <h4>🧭 The GPS of Meaning</h4>
+        <p>A physical map has 2 dimensions (Latitude and Longitude). If two cities have similar GPS numbers, they are physically close together. OpenAI's embeddings have <strong>1,536 dimensions!</strong> Instead of mapping physical space, they map meaning. If the vector numbers for "Puppy" and "Dog" are mathematically close, the Vector Database knows they mean the same thing, even if the letters are completely different.</p>
+      </div>
+      
+      <ul>
+        <li><strong>How many dimensions is better?</strong> Older models used 384 dimensions. Newer ones use 1,536 or 3,072. More dimensions mean the AI understands deeper nuances (e.g., the difference between a "bank" for money and a river "bank"). However, higher dimensions cost more money and take longer to search.</li>
+        <li><strong>When to use Vector DBs:</strong> When you need to match the "vibe" or semantic meaning of a question, not the exact words.</li>
+      </ul>
+
+      <h3>2. Graph Databases (Neo4j)</h3>
+      <p>Graph Databases were born out of a massive failure in old SQL databases. In the early 2000s, social networks like Facebook realized that standard row-and-column databases were terrible at answering questions like: <em>"Find friends of friends who also like pizza."</em></p>
+      <p>A Graph Database doesn't use tables. It uses <strong>Nodes</strong> (nouns, like 'Company' or 'Person') and <strong>Edges</strong> (verbs, like 'OWNS' or 'IS_FRIENDS_WITH').</p>
+      
+      <ul>
+        <li><strong>Why do we need Graph in RAG?</strong> Vector databases are blind to logic. If A owns B, and B owns C, a Vector DB doesn't realize that A owns C. A Graph DB can easily trace that path (multi-hop reasoning).</li>
+        <li><strong>When to use Graph DBs:</strong> For complex reasoning, family trees, corporate ownership, or tracking characters in a massive novel.</li>
+      </ul>
+
+      <div class="deep-dive">
+        <h4 style="color:var(--s1)">In Our Code (store.py)</h4>
+        <p>We use a <strong>Hybrid</strong> approach. We save the text in ChromaDB for semantic matching, and we save the relationships in Neo4j. If Neo4j crashes, our code automatically degrades to a simple local graph so the application never breaks.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- TAB 3: RETRIEVAL -->
+<div class="tab-panel" id="panel-retrieval">
+  <section class="stage">
+    <div class="container">
+      <h2 style="color: var(--s4)">Advanced Retrieval & Reranking</h2>
+      <p>We have our chunked data. We have our databases. Now, a user types a search query. But users write terrible, vague queries. If we just search for what they typed, we will get garbage back.</p>
+
+      <h3>1. BM25 (The Classic Keyword Search)</h3>
+      <p>BM25 is a mathematical algorithm invented in the 1970s. It stands for "Best Matching 25". It is a pure, hardcore keyword search.</p>
+      <ul>
+        <li><strong>Why use old tech?</strong> Vector DBs are great at meaning, but terrible at exact names. If you search a Vector DB for "John Doe", it might return "Jane Smith" because they are both generic names. BM25 looks for the exact letters "J-o-h-n D-o-e". We combine BM25 and Vector Search to get the best of both worlds.</li>
+      </ul>
+
+      <h3>2. Multi-Query Expansion</h3>
+      <p>If a user searches for <em>"fix engine"</em>, we don't send that to the database. We secretly ask a fast LLM to rewrite it into 3 better questions: <em>"How to repair a car engine?"</em>, <em>"Troubleshooting engine failure"</em>, and <em>"Engine maintenance guide."</em> We search the database using all 3!</p>
+
+      <h3>3. HyDE (Hypothetical Document Embeddings)</h3>
+      <p>This is a brilliant trick. When the user asks a question, we ask the LLM to <strong>hallucinate a fake, perfect answer</strong>. It doesn't have to be true; it just has to *look* like a textbook paragraph. We then turn that fake answer into a vector, and search the database for real documents that look mathematically identical to the fake answer.</p>
+      <div class="metaphor-box" style="border-left-color: var(--s4); background: rgba(139,92,246,0.05);">
+        <h4>🕵️‍♂️ The Police Sketch</h4>
+        <p>HyDE is like a police sketch artist. You don't have a photo of the suspect (the real answer), so you describe what they look like (the fake answer). The police use that sketch to search the city and find the real person who matches it perfectly.</p>
+      </div>
+
+      <h3>4. LLM Reranking (The Final Judge)</h3>
+      <p>Because we used BM25, Multi-Query, and HyDE, our search engine might return 30 possible chunks. We cannot feed 30 chunks to the final AI (it would cause "context window" overflow and cost a fortune).</p>
+      <p>We pass all 30 chunks to a fast "Judge LLM". It reads the user's question, reads the 30 chunks, and scores each chunk from 0.0 to 1.0 based on relevance. It throws out the junk, and only passes the <strong>top 3 absolute best chunks</strong> to the final writer.</p>
+
+      <div class="deep-dive">
+        <h4 style="color:var(--s4)">In Our Code (retriever.py)</h4>
+        <p>Our `QueryFusionRetriever` handles the BM25 + Vector blending. We use `LLMRerank` to act as the final judge. This massive pipeline guarantees that the AI never hallucinates, because it is always fed pure, high-quality, relevant facts.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const buttons = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+
+  buttons.forEach(button => {
+    button.addEventListener('click', () => {
+      const targetTab = button.getAttribute('data-tab');
+
+      buttons.forEach(btn => btn.classList.remove('active'));
+      panels.forEach(panel => panel.classList.remove('active'));
+
+      button.classList.add('active');
+      document.getElementById(`panel-${targetTab}`).classList.add('active');
+      
+      if(targetTab === 'chunking') {
+        button.style.backgroundColor = 'rgba(16,185,129,0.2)';
+        button.style.borderColor = 'var(--s2)';
+      } else if (targetTab === 'storage') {
+        button.style.backgroundColor = 'rgba(14,165,233,0.2)';
+        button.style.borderColor = 'var(--s1)';
+      } else {
+        button.style.backgroundColor = 'rgba(139,92,246,0.2)';
+        button.style.borderColor = 'var(--s4)';
+      }
+    });
+  });
+});
+</script>
+
+</body>
+</html>

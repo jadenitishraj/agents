@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Deep Dive into AI Evaluation · Visual Lesson</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a14;
+  --ink: #f4f1ea;
+  --ink-dim: #a8a3b8;
+  --ink-faint: #5a5670;
+
+  --s2: #ec4899; /* Fuchsia */
+  --s7: #f97316; /* Orange */
+  --s8: #facc15; /* Amber */
+
+  --card-bg: rgba(255,255,255,0.03);
+  --card-border: rgba(255,255,255,0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter Tight', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.7;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse at top, rgba(236,72,153,0.12), transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(249,115,22,0.08), transparent 50%);
+  background-attachment: fixed;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 32px;
+  position: relative;
+  z-index: 2;
+}
+
+/* === Typography === */
+.serif { font-family: 'Fraunces', serif; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* === Hero === */
+.hero {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 80px 0 60px;
+}
+.hero .stage-num {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink-faint);
+  margin-bottom: 24px;
+}
+.hero h1 {
+  font-size: clamp(40px, 7vw, 80px);
+  margin-bottom: 24px;
+  background: linear-gradient(135deg, var(--s2) 0%, var(--s7) 50%, var(--s8) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: 'Fraunces', serif;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+.hero .sub {
+  font-size: 20px;
+  color: var(--ink-dim);
+  margin-bottom: 30px;
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+/* === Tab bar === */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(10,10,20,0.9);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--card-border);
+  padding: 16px 0;
+}
+.tabs-inner {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.tab-btn {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 15px;
+  padding: 12px 24px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+.tab-btn:hover {
+  color: var(--ink);
+  background: rgba(255,255,255,0.05);
+}
+.tab-btn.active {
+  color: #fff;
+  border-color: var(--s2);
+  background: rgba(236,72,153,0.2);
+}
+
+/* === Tab panel === */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeIn 0.4s ease; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === Stages & Content === */
+.stage { padding: 60px 0; border-bottom: 1px solid var(--card-border); }
+.stage h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 36px;
+  margin-bottom: 24px;
+  color: var(--s2);
+  letter-spacing: -0.02em;
+}
+.stage h3 {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 40px 0 16px;
+  color: #fff;
+}
+.stage p {
+  font-size: 18px;
+  color: var(--ink-dim);
+  margin-bottom: 20px;
+  font-weight: 300;
+}
+.stage ul {
+  margin: 0 0 20px 24px;
+  color: var(--ink-dim);
+  font-size: 18px;
+  font-weight: 300;
+}
+.stage li { margin-bottom: 12px; }
+.stage strong { color: var(--ink); font-weight: 600; }
+
+/* === Metaphor Box === */
+.metaphor-box {
+  background: rgba(236,72,153,0.05);
+  border-left: 5px solid var(--s2);
+  padding: 30px;
+  border-radius: 0 12px 12px 0;
+  margin: 40px 0;
+}
+.metaphor-box h4 {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  color: #fff;
+  margin-bottom: 12px;
+}
+.metaphor-box p { font-size: 18px; color: var(--ink); margin-bottom: 0; }
+
+/* === Deep Dive Box === */
+.deep-dive {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 30px;
+  margin: 30px 0;
+}
+.deep-dive h4 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--s2);
+  letter-spacing: 0.1em;
+  margin-bottom: 16px;
+}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="container">
+    <div class="stage-num">The Deep Dive into AI Evaluation & Testing</div>
+    <h1>The Science of<br><em>Auditing AI</em></h1>
+    <p class="sub">Writing an AI agent takes an hour. Proving that it won't hallucinate facts, break privacy laws, or waste thousands of dollars in computing costs takes a professional testing framework. Welcome to the deep science of automated AI evaluation.</p>
+  </div>
+</section>
+
+<div class="tabs">
+  <div class="container">
+    <div class="tabs-inner">
+      <button class="tab-btn active" data-tab="factual">1. The Death of Exact Match</button>
+      <button class="tab-btn" data-tab="regulatory">2. Enforcing Global AI Laws</button>
+      <button class="tab-btn" data-tab="operational">3. Live LangGraph Tracing</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 1: FACTUAL GATES -->
+<div class="tab-panel active" id="panel-factual">
+  <section class="stage">
+    <div class="container">
+      <h2 style="color: var(--s2)">Factual Integrity: The Death of Exact Match</h2>
+      <p>For decades, programmers tested software using "Unit Tests". The rule was simple: <code>if output == expected: pass</code>. When AI generates dynamic, human-like paragraphs, that rigid old-school testing completely shatters.</p>
+
+      <div class="metaphor-box" style="border-left-color: var(--s2);">
+        <h4>📝 The Smart Teacher vs. The Dumb Computer</h4>
+        <p>If the expected truth is <em>"The sky is blue"</em>, and the AI generates <em>"It appears that the sky has an azure tint"</em>, an old-school NLP metric (like BLEU or ROUGE) gives a score of 0% because the letters don't overlap. It grades like a dumb computer. We need a system that grades like a Smart Teacher, understanding meaning over syntax.</p>
+      </div>
+
+      <h3>1. G-Eval (The LLM-as-a-Judge)</h3>
+      <p>Instead of counting overlapping words, we use a technique called <strong>G-Eval</strong>. We take the AI's answer, and we hand it to a massive frontier model (like GPT-4) along with a grading rubric.</p>
+      <ul>
+        <li><strong>How it works:</strong> The rubric says: <em>"Score this from 1 to 5 based on whether it preserves the semantic meaning of the expected answer."</em> The Judge LLM reads both, understands the nuances of human language, and outputs a highly accurate score.</li>
+        <li><strong>Why it's revolutionary:</strong> It allows us to mathematically score creativity, tone, and factual alignment without punishing the AI for using different synonyms.</li>
+      </ul>
+
+      <h3>2. The Difference Between Hallucination and Faithfulness</h3>
+      <p>People use these two words interchangeably, but in AI evaluation, they measure two very different points of failure:</p>
+      <ul>
+        <li><strong>Hallucination:</strong> Did the AI make up general gossip? We grade the AI's final answer against the massive source documents. If the source documents mention "Apples" and the AI talks about "Oranges", it hallucinated.</li>
+        <li><strong>Faithfulness:</strong> Did the AI lie about the *specific facts* we handed to it? In RAG, we extract bullet points from the text. Faithfulness measures if the AI stayed 100% loyal to those bullet points without exaggerating them. It checks if the AI is a reliable witness.</li>
+      </ul>
+
+      <div class="deep-dive">
+        <h4 style="color:var(--s2)">In Our Code (lexical_code.py)</h4>
+        <p>We use the DeepEval library to run these G-Eval checks automatically. We also run a <code>Code Correctness</code> check. If the user asked for Python code, the judge verifies that the code is enclosed in proper markdown backticks and structurally sound, without executing dangerous raw code on our servers.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- TAB 2: REGULATORY COMPLIANCE -->
+<div class="tab-panel" id="panel-regulatory">
+  <section class="stage">
+    <div class="container">
+      <h2 style="color: var(--s7)">Enforcing Global AI Laws</h2>
+      <p>Code is no longer just logic; it is liability. In 2024, the European Union passed the world's first comprehensive AI law, and India enacted strict data privacy rules. If your AI violates them in production, your company faces massive fines.</p>
+
+      <h3>1. The EU AI Act (Risk Tiers)</h3>
+      <p>The EU AI Act categorizes AI into risk tiers: Unacceptable Risk, High Risk, Limited Risk, and Minimal Risk. Systems that pose an "Unacceptable Risk" are banned outright.</p>
+      <ul>
+        <li><strong>What we audit for:</strong> Our evaluation system uses a strict G-Eval rubric to scan every single output for <em>Subliminal Manipulation</em> (tricking users), <em>Emotion Recognition in Workplaces</em>, and <em>Social Scoring</em>. If the AI output tries to judge a person's worth based on their behavior, the evaluation forcefully fails the test.</li>
+      </ul>
+      
+      <div class="metaphor-box" style="border-left-color: var(--s7); background: rgba(249,115,22,0.05);">
+        <h4>⚖️ The Legal Inspector</h4>
+        <p>Imagine deploying a customer service bot. A user asks, "Am I a good person?" If the AI responds by analyzing their chat history and assigning them a "morality score of 4/10", you just broke international law. The Legal Inspector evaluates the AI in the testing lab before it ever sees the public.</p>
+      </div>
+
+      <h3>2. Indian DPDP Act (Data Protection)</h3>
+      <p>The Digital Personal Data Protection (DPDP) Act mandates that Personally Identifiable Information (PII) must not be processed or leaked without explicit consent.</p>
+      <ul>
+        <li><strong>What is PII?</strong> Aadhaar numbers (Indian National ID), PAN cards, raw phone numbers, and emails.</li>
+        <li><strong>Redaction vs. Masking:</strong> If an AI sees a phone number, you could just delete it (Redaction). But if you delete it, the AI might output weird, broken sentences like "Your ID is and your phone is ." Instead, we use <strong>Masking</strong>. We replace the number with a placeholder like <code>[REDACTED_AADHAAR]</code>. This keeps the sentence grammatically perfect, lets the AI know an ID was present, but completely protects the user's private data.</li>
+      </ul>
+
+      <div class="deep-dive">
+        <h4 style="color:var(--s7)">In Our Code (compliance.py)</h4>
+        <p>We built custom DeepEval G-Eval metrics that act as automated lawyers. They read the outputs specifically looking for EU AI Act violations and DPDP unmasked PII. If it finds a 12-digit number that isn't masked, the test fails, preventing the deployment of that code.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- TAB 3: OPERATIONAL TRACE TESTING -->
+<div class="tab-panel" id="panel-operational">
+  <section class="stage">
+    <div class="container">
+      <h2 style="color: var(--s8)">Operational Trace Testing</h2>
+      <p>Testing a single string of text against another string is called "Static Testing". It's fine for simple apps, but AI agents are dynamic. They think, they loop, they use tools, and they change their minds. We must test them while they are moving.</p>
+
+      <h3>1. Live LangGraph Tracing</h3>
+      <p>Our AI system is built on LangGraph, meaning it has a "Planner", a "Searcher", a "Writer", and a "Critic". They pass notes to each other in a loop.</p>
+      <ul>
+        <li><strong>The Problem with Static Tests:</strong> A static test only looks at the final answer. It doesn't know if the AI spent $50 on API calls and searched the web 100 times just to answer "What is 2+2?".</li>
+        <li><strong>The Trace:</strong> A "Trace" is the complete history of everything the agent did. It records every tool call, every loop, and every millisecond spent thinking.</li>
+      </ul>
+
+      <div class="metaphor-box" style="border-left-color: var(--s8); background: rgba(250,204,21,0.05);">
+        <h4>🚗 The Crash Test Simulator</h4>
+        <p>You wouldn't test a car's airbag by taking it out of the car and hitting it with a hammer. You test it by putting it in a real car and driving into a wall. Our live tests put a real question into the active LangGraph engine, let the agents fight it out, and then grade the entire performance from start to finish.</p>
+      </div>
+
+      <h3>2. Measuring Efficiency & Completion</h3>
+      <p>When we test the live trace, we evaluate two operational metrics:</p>
+      <ul>
+        <li><strong>Step Efficiency:</strong> If the Writer writes a draft, and the Critic rejects it, they loop. If they loop 2 times, that's good peer-review. If they loop 15 times, the AI is broken, trapped in an infinite argument, burning expensive API credits. The test measures loop counts to ensure operational efficiency.</li>
+        <li><strong>Task Completion:</strong> Did the agent actually do all the work? If the user asks: <em>"Explain Python AND write a script"</em>, the agent might write a great explanation but forget the script. The evaluation scans the final answer against the multi-part prompt to ensure 100% completion.</li>
+      </ul>
+
+      <div class="deep-dive">
+        <h4 style="color:var(--s8)">In Our Code (test_agent_evaluation.py)</h4>
+        <p>Our code spins up the orchestrator, fires a real prompt through the graph, captures the exact state (the number of iterations, the number of sources found, the time elapsed), and feeds that live state into the DeepEval rubrics. It proves the system works in the real world.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const buttons = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+
+  buttons.forEach(button => {
+    button.addEventListener('click', () => {
+      const targetTab = button.getAttribute('data-tab');
+
+      buttons.forEach(btn => btn.classList.remove('active'));
+      panels.forEach(panel => panel.classList.remove('active'));
+
+      button.classList.add('active');
+      document.getElementById(`panel-${targetTab}`).classList.add('active');
+      
+      if(targetTab === 'factual') {
+        button.style.backgroundColor = 'rgba(236,72,153,0.2)';
+        button.style.borderColor = 'var(--s2)';
+      } else if (targetTab === 'regulatory') {
+        button.style.backgroundColor = 'rgba(249,115,22,0.2)';
+        button.style.borderColor = 'var(--s7)';
+      } else {
+        button.style.backgroundColor = 'rgba(250,204,21,0.2)';
+        button.style.borderColor = 'var(--s8)';
+      }
+    });
+  });
+});
+</script>
+
+</body>
+</html>
