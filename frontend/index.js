@@ -61,6 +61,8 @@ function resetUI() {
     document.getElementById("error-section").style.display = "none";
     document.getElementById("team-badges").innerHTML = "";
     document.getElementById("final-answer").textContent = "";
+    document.getElementById("rag-metrics").innerHTML = "";
+    document.getElementById("rag-metrics").style.display = "none";
     document.getElementById("run-summary").textContent = "";
 }
 
@@ -85,9 +87,11 @@ function showTeam(team) {
 function showAnswer(data) {
     const section = document.getElementById("answer-section");
     const answer = document.getElementById("final-answer");
+    const metrics = document.getElementById("rag-metrics");
     const summary = document.getElementById("run-summary");
 
     answer.textContent = data.final_answer;
+    showMetrics(metrics, data.rag_metrics || {}, data.rag_parser_summary || {});
     summary.textContent =
         `${data.iterations} iteration(s) · ${data.llm_calls} LLM calls · ` +
         `${data.sources_count} sources · ${data.duration_seconds.toFixed(1)}s`;
@@ -101,6 +105,32 @@ function showError(message) {
     const el = document.getElementById("error-message");
     el.textContent = message;
     section.style.display = "block";
+}
+
+function showMetrics(container, metrics, parserSummary) {
+    const cards = Object.entries(metrics)
+        .filter(([key]) => key !== "note")
+        .map(([key, value]) => {
+            const label = key.replace(/_/g, " ");
+            return `
+                <div class="metric-card">
+                    <span class="metric-label">${escapeHtml(label)}</span>
+                    <span class="metric-value">${Number(value).toFixed(2)}</span>
+                </div>
+            `;
+        });
+
+    const parserText = Object.entries(parserSummary)
+        .map(([name, count]) => `${name}: ${count}`)
+        .join(" · ");
+
+    const note = metrics.note || "";
+    const detail = [parserText, note].filter(Boolean).join(" | ");
+
+    if (!cards.length && !detail) return;
+
+    container.innerHTML = `${cards.join("")}${detail ? `<div class="metric-note">${escapeHtml(detail)}</div>` : ""}`;
+    container.style.display = "grid";
 }
 
 function escapeHtml(text) {

@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from backend.guardrails.pipeline import input_guard, output_guard, is_safe
 from backend.orchestrator import compile_graph, create_initial_state
+from backend.rag import evaluate_answer
 
 # --- Observability Setup ---
 from logger.loki import logger
@@ -106,6 +107,12 @@ async def research(req: ResearchRequest):
     final_state["duration_seconds"] = time.time() - start_time
     is_allowed, msg = is_safe(output_guard, final_state.get("answer", ""))
     final_state["final_answer"] = final_state.get("answer", "") if is_allowed else msg
+    final_state["rag_metrics"] = evaluate_answer(
+        final_state.get("question", ""),
+        final_state.get("final_answer", ""),
+        final_state.get("rag_contexts", []),
+        final_state.get("rag_reference", ""),
+    )
 
     # Push Custom Metrics via OpenTelemetry
     llm_calls_counter.add(final_state.get("llm_calls", 0))
@@ -125,6 +132,8 @@ async def research(req: ResearchRequest):
         "sources_count": final_state.get("sources_count", 0),
         "duration_seconds": final_state.get("duration_seconds", 0),
         "was_sensitive": final_state.get("was_sensitive", False),
+        "rag_metrics": final_state.get("rag_metrics", {}),
+        "rag_parser_summary": final_state.get("rag_parser_summary", {}),
         "guardrails": {
             "input": {"allowed": True, "user_message": "OK"},
             "output": {"allowed": is_allowed, "user_message": msg},

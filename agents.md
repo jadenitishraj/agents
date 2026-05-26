@@ -23,6 +23,7 @@ A modular multi-agent research system for teaching students how to build product
 ```
 agents/
 ├── agents.md                          # THIS FILE — project context for AI sessions
+├── skills.md                          # Student pedagogical principles & rules (under 50 lines rule, etc.)
 ├── main.py                            # Entry point — starts uvicorn server
 ├── README.md                          # Quick start guide for students
 ├── .env                               # API keys (OPENAI_API_KEY, LANGSMITH_API_KEY)
@@ -55,10 +56,21 @@ agents/
 │   │   ├── team_selector.py           # select_team(), needs_deep_reading(), is_sensitive()
 │   │   └── raci.py                    # RACIEntry dataclass, build_raci()
 │   │
+│   ├── rag/                           # LlamaIndex Advanced RAG (Hyper-modular, <50 lines per file)
+│   │   ├── __init__.py
+│   │   ├── classifier.py              # Content structure classifier (YouTube transcripts vs clean text)
+│   │   ├── parser.py                  # Chunk splitter and metadata applicator
+│   │   ├── store.py                   # Storage context manager (Local ChromaDB + Neo4j fallback)
+│   │   ├── indexer.py                 # Unified indexing orchestration
+│   │   ├── query_transform.py         # HyDE and query rephrasing transform node
+│   │   ├── retriever.py               # Multi-hop Graph + Hybrid BM25 & Semantic retriever
+│   │   └── reranker.py                # LLMRerank fusion and context pruning node
+│   │
 │   └── evaluation/                    # Post-run analysis
 │       ├── __init__.py
 │       ├── incentives.py              # IncentiveRisk dataclass, scan_incentives()
-│       └── serialization.py           # serialize_trace(), deserialize_trace()
+│       ├── serialization.py           # serialize_trace(), deserialize_trace()
+│       └── rag_eval.py                # Ragas LLM-as-a-judge dynamic evaluation scorecard
 │
 ├── frontend/
 │   ├── index.html                     # Single page: input → spinner → answer
@@ -66,7 +78,8 @@ agents/
 │   └── index.js                       # One fetch() call to POST /research
 │
 └── plans/                             # Feature plans with checklists
-    └── TEMPLATE.md                    # Standard template for new feature plans
+    ├── TEMPLATE.md                    # Standard template for new feature plans
+    └── advanced_rag_pipeline.md       # Full implementation checklist for Hybrid/Graph RAG + Ragas
 ```
 
 ## Architecture
@@ -198,6 +211,11 @@ Each role has `phase` and `order` for dynamic graph wiring:
 | HITL | orchestrator.py (human_review_node) | Human-in-the-loop concept (auto-approved for simplicity) |
 | Tool vs Agent | tools/search.py + agents/searcher.py | DuckDuckGo is a tool, Searcher is the agent that uses it |
 | Observability | All agents (@traceable) + api.py | LangSmith tracing for every agent, tool, and LLM call |
+| Hyper-Modularity | skills.md + backend/rag/* | Coding principles: <50 lines per module, highly isolated files |
+| Dynamic Ingestion | backend/rag/classifier.py + parser.py | Dynamic document classification and custom semantic chunking |
+| Hybrid & Graph RAG | backend/rag/store.py + retriever.py | Local ChromaDB + local/cloud Neo4j Graph DB with graceful degradation |
+| Advanced Querying | backend/rag/query_transform.py + reranker.py | HyDE, Multi-Query expansion, and context rerank fusion |
+| Automated Evaluation | backend/evaluation/rag_eval.py | Ragas LLM-as-a-judge scorecards (Faithfulness, Recall, Precision) |
 
 ## How to Run
 

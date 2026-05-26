@@ -46,6 +46,11 @@ class State(TypedDict, total=False):
     queries: list[str]
     sources: list[Source]
     facts: list[str]
+    rag_contexts: list[str]
+    rag_citations: list[Source]
+    rag_parser_summary: dict[str, int]
+    rag_reference: str
+    rag_metrics: dict
     disclaimer: str
     answer: str
     critic_feedback: str
@@ -105,10 +110,14 @@ def searcher_node(state: State) -> dict:
 def reader_node(state: State) -> dict:
     """Run the Reader agent to extract facts."""
     print("  Reader -> extracting facts...")
-    facts = reader_agent(state["question"], state.get("sources", []))
-    print(f"    {len(facts)} facts extracted")
+    result = reader_agent(state["question"], state.get("sources", []))
+    print(f"    {len(result.facts)} facts extracted from {len(result.contexts)} contexts")
     return {
-        "facts": facts,
+        "facts": result.facts,
+        "rag_contexts": result.contexts,
+        "rag_citations": result.citations,
+        "rag_parser_summary": result.parser_summary,
+        "rag_reference": result.reference,
         "llm_calls": state.get("llm_calls", 0) + 1,
     }
 
@@ -327,6 +336,11 @@ def create_initial_state(question: str, max_iterations: int = 3) -> tuple[State,
         "queries": [],
         "sources": [],
         "facts": [],
+        "rag_contexts": [],
+        "rag_citations": [],
+        "rag_parser_summary": {},
+        "rag_reference": "",
+        "rag_metrics": {},
         "disclaimer": "",
         "answer": "",
         "critic_feedback": "",

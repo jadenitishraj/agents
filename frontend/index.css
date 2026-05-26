@@ -245,6 +245,43 @@ h2 {
     flex-wrap: wrap;
 }
 
+.rag-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.metric-card {
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.22);
+    border-radius: var(--radius-sm);
+    padding: 0.9rem 1rem;
+}
+
+.metric-label {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.metric-value {
+    display: block;
+    color: #c7d2fe;
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-top: 0.2rem;
+}
+
+.metric-note {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+    grid-column: 1 / -1;
+}
+
 /* ─── Helicone Link ───────────────────────────────────────── */
 
 .helicone-link {
