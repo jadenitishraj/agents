@@ -1,0 +1,96 @@
+"""Generate a simple test PDF with known facts for RAG testing."""
+
+from pathlib import Path
+
+try:
+    from fpdf import FPDF
+except ImportError:
+    print("fpdf2 not installed. Installing...")
+    import subprocess, sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "fpdf2"])
+    from fpdf import FPDF
+
+OUTPUT = Path(__file__).resolve().parent / "test_doc.pdf"
+
+pdf = FPDF()
+pdf.set_auto_page_break(auto=True, margin=15)
+
+# Page 1
+pdf.add_page()
+pdf.set_font("Helvetica", "B", 20)
+pdf.cell(0, 12, "NovaTech Solutions - Company Profile", new_x="LMARGIN", new_y="NEXT")
+pdf.ln(8)
+pdf.set_font("Helvetica", "", 12)
+
+page1 = """NovaTech Solutions is a technology company headquartered in Bangalore, India. \
+The company was founded in March 2019 by Priya Sharma and Arjun Mehta. \
+NovaTech specializes in building enterprise automation platforms powered by artificial intelligence.
+
+As of 2024, NovaTech has 350 employees across three offices: Bangalore (HQ), Hyderabad, and Singapore. \
+The company raised Series B funding of $42 million in January 2023 from Sequoia Capital India and Accel Partners.
+
+NovaTech's flagship product is called AutoFlow, an intelligent workflow orchestration engine \
+that connects to over 200 enterprise SaaS applications including Salesforce, SAP, and ServiceNow. \
+AutoFlow uses a proprietary LLM-based reasoning engine to automate complex multi-step business processes \
+without requiring manual rule configuration.
+
+The company's annual recurring revenue (ARR) reached $18 million in Q3 2024, \
+growing at 140% year-over-year. Key clients include Infosys, Tata Consultancy Services, \
+and the State Bank of India."""
+pdf.multi_cell(0, 7, page1)
+
+# Page 2
+pdf.add_page()
+pdf.set_font("Helvetica", "B", 16)
+pdf.cell(0, 10, "Technical Architecture", new_x="LMARGIN", new_y="NEXT")
+pdf.ln(5)
+pdf.set_font("Helvetica", "", 12)
+
+page2 = """AutoFlow's architecture consists of four core layers:
+
+1. Connector Layer: Pre-built API adapters for 200+ SaaS tools. Each connector handles \
+authentication, rate limiting, and schema mapping automatically.
+
+2. Reasoning Engine: A fine-tuned GPT-4o-mini model that interprets user intent from \
+natural language descriptions and decomposes complex workflows into executable steps.
+
+3. Execution Runtime: A distributed task scheduler built on Apache Kafka and Kubernetes \
+that executes workflow steps with exactly-once delivery guarantees and automatic retry logic.
+
+4. Observability Dashboard: Real-time monitoring of all workflow executions with \
+LangSmith integration for LLM call tracing, cost tracking, and latency analysis.
+
+AutoFlow processes an average of 2.3 million workflow executions per month across all clients. \
+The median end-to-end latency for a 5-step workflow is 4.2 seconds. \
+The system maintains 99.97% uptime as measured over the trailing 12-month period.
+
+Security certifications include SOC 2 Type II, ISO 27001, and GDPR compliance. \
+All customer data is encrypted at rest using AES-256 and in transit using TLS 1.3."""
+pdf.multi_cell(0, 7, page2)
+
+# Page 3
+pdf.add_page()
+pdf.set_font("Helvetica", "B", 16)
+pdf.cell(0, 10, "Leadership Team", new_x="LMARGIN", new_y="NEXT")
+pdf.ln(5)
+pdf.set_font("Helvetica", "", 12)
+
+page3 = """Priya Sharma (CEO & Co-founder): Previously led the AI Platform team at Google Bangalore \
+for 6 years. Holds a PhD in Machine Learning from IIT Delhi. Named to Forbes India 30 Under 30 in 2020.
+
+Arjun Mehta (CTO & Co-founder): Former Staff Engineer at Amazon Web Services, \
+where he designed the auto-scaling infrastructure for AWS Lambda. \
+Holds an MS in Distributed Systems from Carnegie Mellon University.
+
+Deepa Krishnan (VP Engineering): Joined from Microsoft Azure in 2021. \
+Manages a team of 120 engineers across backend, ML, and platform infrastructure.
+
+Rahul Verma (VP Sales): Previously Regional Sales Director at Salesforce India. \
+Responsible for growing NovaTech's enterprise client base from 12 to 85 accounts in 18 months.
+
+The company plans to expand to the Middle East market in Q1 2025 \
+and is currently hiring for offices in Dubai and Riyadh."""
+pdf.multi_cell(0, 7, page3)
+
+pdf.output(str(OUTPUT))
+print(f"Created test PDF: {OUTPUT} ({OUTPUT.stat().st_size} bytes)")

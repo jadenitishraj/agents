@@ -1,7 +1,9 @@
 """FastAPI application — simple request/response API.
 
-One endpoint: POST /research → invoke graph → return result.
-No streaming, no SSE, no approve endpoint.
+Endpoints:
+  POST /research  → invoke graph → return result.
+  POST /rag/upload → upload a file, index it, return corpus_id.
+  POST /rag/search → pure retrieval search (no answer generation).
 """
 
 from __future__ import annotations
@@ -14,7 +16,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()  # Load .env BEFORE any LangChain/LangSmith imports
 
-from fastapi import FastAPI
+import uuid
+
+from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +28,13 @@ from pydantic import BaseModel
 from backend.guardrails.pipeline import input_guard, output_guard, is_safe
 from backend.orchestrator import compile_graph, create_initial_state
 from backend.rag import evaluate_answer
+from backend.rag.classifier import classify_sources
+from backend.rag.parser import parse_sources
+from backend.rag.indexer import build_corpus
+from backend.rag.search import search_corpus
+from backend.rag import registry as rag_registry
+from backend.rag.models import IndexedCorpus, Source
+from backend.rag.llm import configure_settings
 
 # --- Observability Setup ---
 from logger.loki import logger
@@ -138,4 +149,97 @@ async def research(req: ResearchRequest):
             "input": {"allowed": True, "user_message": "OK"},
             "output": {"allowed": is_allowed, "user_message": msg},
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# RAG Search endpoints — upload a file and search it without answer generation.
+# ---------------------------------------------------------------------------
+
+ALLOWED_SUFFIXES = {".pdf", ".txt", ".md"}
+UPLOAD_DIR = Path(__file__).resolve().parent / "rag" / "data" / "need-processing"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+class RagSearchRequest(BaseModel):
+    query: str
+    corpus_id: str = ""
+    top_k: int = 5
+
+
+@app.post("/rag/upload")
+async def rag_upload(file: UploadFile = File(...)):
+    """Upload a document, index it, return corpus_id."""
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in ALLOWED_SUFFIXES:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Unsupported file type: {suffix}. Use .pdf, .txt, or .md"},
+        )
+
+    # Save to hot-folder
+    save_path = UPLOAD_DIR / (file.filename or "upload.txt")
+    content = await file.read()
+    with open(save_path, "wb") as f:
+        f.write(content)
+
+    logger.info(f"RAG upload: saved {file.filename} ({len(content)} bytes)")
+
+    # Build corpus using the existing pipeline
+    configure_settings()
+    source: Source = {
+        "title": file.filename or "Uploaded Document",
+        "url": str(save_path),
+        "snippet": content[:300].decode("utf-8", errors="replace"),
+    }
+
+    try:
+        corpus = build_corpus("uploaded document", [source])
+    except Exception as e:
+        logger.error(f"RAG indexing failed: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+    corpus_id = str(uuid.uuid4())[:8]
+    rag_registry.register(corpus_id, corpus)
+
+    logger.info(f"RAG indexed: corpus_id={corpus_id}, chunks={len(corpus.nodes)}")
+
+    return {
+        "corpus_id": corpus_id,
+        "filename": file.filename,
+        "chunks": len(corpus.nodes),
+        "categories": list({c.category for c in corpus.classified}),
+        "strategies": list({c.chunk_strategy for c in corpus.classified}),
+    }
+
+
+@app.post("/rag/search")
+async def rag_search(req: RagSearchRequest):
+    """Search the indexed corpus — pure retrieval, no answer generation."""
+    # Use latest corpus if none specified
+    corpus_id = req.corpus_id or (rag_registry.list_ids()[-1] if rag_registry.list_ids() else "")
+    if not corpus_id:
+        return JSONResponse(status_code=400, content={"error": "No corpus indexed. Upload a file first."})
+
+    corpus = rag_registry.get(corpus_id)
+    if corpus is None:
+        return JSONResponse(status_code=404, content={"error": f"Corpus '{corpus_id}' not found."})
+
+    logger.info(f"RAG search: corpus={corpus_id}, query={req.query!r}")
+
+    start = time.time()
+    try:
+        results = search_corpus(corpus, req.query, top_k=req.top_k)
+    except Exception as e:
+        logger.error(f"RAG search failed: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+    elapsed = time.time() - start
+    logger.info(f"RAG search complete: {len(results)} results in {elapsed:.2f}s")
+
+    return {
+        "corpus_id": corpus_id,
+        "query": req.query,
+        "results": results,
+        "elapsed_seconds": round(elapsed, 2),
     }

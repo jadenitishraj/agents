@@ -3,359 +3,521 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Deep Dive into RAG · Visual Lesson</title>
+<title>Advanced RAG - Hybrid Retrieval Production Lesson</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg: #0a0a14;
-  --ink: #f4f1ea;
-  --ink-dim: #a8a3b8;
-  --ink-faint: #5a5670;
-
-  --s1: #0ea5e9; /* Sky Blue */
-  --s2: #10b981; /* Emerald */
-  --s3: #6366f1; /* Indigo */
-  --s4: #8b5cf6; /* Purple */
-
-  --card-bg: rgba(255,255,255,0.03);
-  --card-border: rgba(255,255,255,0.08);
+:root{
+  --bg:#0a0a14;
+  --ink:#f4f1ea;
+  --ink-dim:#aaa5b8;
+  --ink-faint:#625d76;
+  --sky:#0ea5e9;
+  --emerald:#10b981;
+  --indigo:#6366f1;
+  --violet:#8b5cf6;
+  --amber:#f59e0b;
+  --rose:#f43f5e;
+  --card-bg:rgba(255,255,255,.035);
+  --card-border:rgba(255,255,255,.09);
+  --panel:rgba(255,255,255,.025);
 }
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-body {
-  font-family: 'Inter Tight', sans-serif;
-  background: var(--bg);
-  color: var(--ink);
-  line-height: 1.7;
-  overflow-x: hidden;
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Inter Tight',sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  line-height:1.6;
+  overflow-x:hidden;
   background-image:
-    radial-gradient(ellipse at top, rgba(16,185,129,0.12), transparent 50%),
-    radial-gradient(ellipse at bottom, rgba(99,102,241,0.08), transparent 50%);
-  background-attachment: fixed;
+    radial-gradient(ellipse at top left,rgba(16,185,129,.16),transparent 42%),
+    radial-gradient(ellipse at bottom right,rgba(99,102,241,.12),transparent 46%);
+  background-attachment:fixed;
 }
-
-.container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 0 32px;
-  position: relative;
-  z-index: 2;
+body:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:1;
+  opacity:.33;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
 }
-
-/* === Typography === */
-.serif { font-family: 'Fraunces', serif; }
-.mono { font-family: 'JetBrains Mono', monospace; }
-
-/* === Hero === */
-.hero {
-  min-height: 60vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 80px 0 60px;
+.container{max-width:1280px;margin:0 auto;padding:0 32px;position:relative;z-index:2}
+.display{font-family:'Fraunces',serif;font-weight:900;letter-spacing:-.04em;line-height:.95}
+.label{
+  font-family:'JetBrains Mono',monospace;
+  text-transform:uppercase;
+  letter-spacing:.18em;
+  font-size:11px;
+  color:var(--ink-dim);
 }
-.hero .stage-num {
-  font-family: 'Fraunces', serif;
-  font-style: italic;
-  font-size: 16px;
-  color: var(--ink-faint);
-  margin-bottom: 24px;
+.hero{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:80px 0 60px;
+  position:relative;
 }
-.hero h1 {
-  font-size: clamp(40px, 7vw, 80px);
-  margin-bottom: 24px;
-  background: linear-gradient(135deg, var(--s1) 0%, var(--s2) 50%, var(--s3) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-family: 'Fraunces', serif;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
+.hero .stage-num{
+  font-family:'Fraunces',serif;
+  font-style:italic;
+  font-weight:300;
+  font-size:14px;
+  color:var(--ink-faint);
+  margin-bottom:24px;
 }
-.hero .sub {
-  font-size: 20px;
-  color: var(--ink-dim);
-  margin-bottom: 30px;
-  font-weight: 300;
-  line-height: 1.6;
+.hero h1{
+  font-size:clamp(48px,9vw,124px);
+  margin-bottom:32px;
+  background:linear-gradient(135deg,var(--sky),var(--emerald),var(--indigo));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
 }
-
-/* === Tab bar === */
-.tabs {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: rgba(10,10,20,0.9);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--card-border);
-  padding: 16px 0;
+.hero h1 em{font-style:italic;font-weight:300;color:var(--ink);-webkit-text-fill-color:var(--ink)}
+.hero .sub{
+  font-size:clamp(18px,2.2vw,24px);
+  max-width:830px;
+  color:var(--ink-dim);
+  margin-bottom:52px;
+  font-weight:300;
 }
-.tabs-inner {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;max-width:1000px}
+.stat{border-left:2px solid var(--card-border);padding-left:16px}
+.stat .num{font-family:'Fraunces',serif;font-size:36px;font-weight:800;letter-spacing:-.03em}
+.stat .label{margin-top:4px}
+.scroll-hint{
+  position:absolute;
+  bottom:36px;
+  left:50%;
+  transform:translateX(-50%);
+  color:var(--ink-faint);
+  font-size:11px;
+  letter-spacing:.3em;
+  text-transform:uppercase;
+  animation:bob 2s ease-in-out infinite;
 }
-.tab-btn {
-  font-family: 'Inter Tight', sans-serif;
-  font-size: 15px;
-  padding: 12px 24px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--card-border);
-  border-radius: 6px;
-  color: var(--ink-dim);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: 500;
+@keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,8px)}}
+.tabs{
+  position:sticky;
+  top:0;
+  z-index:50;
+  background:rgba(10,10,20,.91);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--card-border);
+  padding:14px 0;
 }
-.tab-btn:hover {
-  color: var(--ink);
-  background: rgba(255,255,255,0.05);
+.tabs-inner{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.tab-btn{
+  font:600 12px 'JetBrains Mono',monospace;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  padding:11px 14px;
+  background:rgba(255,255,255,.025);
+  border:1px solid var(--card-border);
+  border-radius:4px;
+  color:var(--ink-dim);
+  cursor:pointer;
 }
-.tab-btn.active {
-  color: #fff;
-  border-color: var(--s2);
-  background: rgba(16,185,129,0.2);
+.tab-btn:hover{color:var(--ink);background:rgba(255,255,255,.055)}
+.tab-btn.active{color:#fff;border-color:var(--accent);background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.tab-panel{display:none}
+.tab-panel.active{display:block;animation:fadeIn .35s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.stage{padding:96px 0;border-top:1px solid var(--card-border)}
+.stage-header{display:grid;grid-template-columns:80px 1fr;gap:24px;margin-bottom:48px;align-items:start}
+.stage-num-big{
+  font-family:'Fraunces',serif;
+  font-style:italic;
+  font-size:64px;
+  line-height:1;
+  color:var(--accent);
+  font-weight:300;
 }
-
-/* === Tab panel === */
-.tab-panel { display: none; }
-.tab-panel.active { display: block; animation: fadeIn 0.4s ease; }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+.stage-title{
+  font-family:'Fraunces',serif;
+  font-weight:800;
+  font-size:clamp(34px,5vw,58px);
+  letter-spacing:-.03em;
+  line-height:1.05;
+  margin-bottom:12px;
 }
-
-/* === Stages & Content === */
-.stage { padding: 60px 0; border-bottom: 1px solid var(--card-border); }
-.stage h2 {
-  font-family: 'Fraunces', serif;
-  font-size: 36px;
-  margin-bottom: 24px;
-  color: var(--s1);
-  letter-spacing: -0.02em;
+.stage-kicker{font-size:18px;color:var(--ink-dim);font-weight:300;max-width:870px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.card{
+  background:var(--card-bg);
+  border:1px solid var(--card-border);
+  border-radius:6px;
+  padding:28px;
+  backdrop-filter:blur(10px);
 }
-.stage h3 {
-  font-family: 'Inter Tight', sans-serif;
-  font-size: 24px;
-  font-weight: 600;
-  margin: 40px 0 16px;
-  color: #fff;
+.card.accent{border-left:3px solid var(--accent)}
+.card h3,.card h4{font-family:'Fraunces',serif;font-size:25px;line-height:1.1;margin-bottom:12px}
+.card p,.card li{color:var(--ink-dim);font-size:17px;font-weight:300}
+.card ul{margin:14px 0 0 20px}
+.card li{margin-bottom:10px}
+.strong{color:var(--ink);font-weight:600}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
+.pill{
+  font:700 11px 'JetBrains Mono',monospace;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 13%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
+  border-radius:4px;
+  padding:7px 9px;
 }
-.stage p {
-  font-size: 18px;
-  color: var(--ink-dim);
-  margin-bottom: 20px;
-  font-weight: 300;
+.pipeline{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:8px;
+  margin:32px 0;
 }
-.stage ul {
-  margin: 0 0 20px 24px;
-  color: var(--ink-dim);
-  font-size: 18px;
-  font-weight: 300;
+.pipe-step{
+  min-height:142px;
+  padding:16px;
+  border:1px solid var(--card-border);
+  background:var(--panel);
+  border-radius:6px;
+  position:relative;
 }
-.stage li { margin-bottom: 12px; }
-.stage strong { color: var(--ink); font-weight: 600; }
-
-/* === Metaphor Box === */
-.metaphor-box {
-  background: rgba(16,185,129,0.05);
-  border-left: 5px solid var(--s2);
-  padding: 30px;
-  border-radius: 0 12px 12px 0;
-  margin: 40px 0;
+.pipe-step:after{
+  content:"";
+  position:absolute;
+  right:-8px;
+  top:50%;
+  width:8px;
+  height:1px;
+  background:var(--card-border);
 }
-.metaphor-box h4 {
-  font-family: 'Fraunces', serif;
-  font-size: 24px;
-  color: #fff;
-  margin-bottom: 12px;
+.pipe-step:last-child:after{display:none}
+.pipe-step .n{font:800 12px 'JetBrains Mono',monospace;color:var(--accent);margin-bottom:8px}
+.pipe-step h4{font-family:'Fraunces',serif;font-size:18px;margin-bottom:7px}
+.pipe-step p{font-size:14px;color:var(--ink-dim)}
+.router{
+  display:grid;
+  grid-template-columns:1fr 1.2fr;
+  gap:24px;
+  margin-top:24px;
 }
-.metaphor-box p { font-size: 18px; color: var(--ink); margin-bottom: 0; }
-
-/* === Deep Dive Box === */
-.deep-dive {
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  padding: 30px;
-  margin: 30px 0;
+.route-list{display:grid;gap:10px}
+.route{
+  display:grid;
+  grid-template-columns:150px 1fr;
+  gap:14px;
+  padding:14px;
+  border:1px solid var(--card-border);
+  background:rgba(255,255,255,.025);
+  border-radius:5px;
 }
-.deep-dive h4 {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  text-transform: uppercase;
-  color: var(--s3);
-  letter-spacing: 0.1em;
-  margin-bottom: 16px;
+.route .kind{font:800 12px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.route p{font-size:15px;color:var(--ink-dim)}
+.storage-map{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+  align-items:stretch;
+}
+.store-box{
+  padding:28px;
+  border:1px solid var(--card-border);
+  border-radius:6px;
+  background:rgba(0,0,0,.2);
+}
+.store-box h3{font-family:'Fraunces',serif;font-size:31px;margin-bottom:12px}
+.store-box.vector{border-color:color-mix(in srgb,var(--emerald) 36%,var(--card-border))}
+.store-box.graph{border-color:color-mix(in srgb,var(--indigo) 36%,var(--card-border))}
+.dots{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin:20px 0}
+.dot{aspect-ratio:1;border-radius:3px;background:linear-gradient(135deg,var(--emerald),var(--sky));opacity:.75}
+.nodes{position:relative;min-height:190px;margin:20px 0}
+.node{
+  position:absolute;
+  width:78px;
+  height:42px;
+  border:1px solid color-mix(in srgb,var(--indigo) 55%,white);
+  background:rgba(99,102,241,.14);
+  border-radius:5px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font:800 11px 'JetBrains Mono',monospace;
+}
+.edge{position:absolute;height:1px;background:rgba(255,255,255,.25);transform-origin:left center}
+.vocab-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.term{
+  padding:18px;
+  border:1px solid var(--card-border);
+  border-radius:5px;
+  background:rgba(255,255,255,.025);
+}
+.term .word{font:800 13px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.term p{font-size:15px;color:var(--ink-dim)}
+.compare{width:100%;border-collapse:separate;border-spacing:0;margin-top:16px}
+.compare th{
+  font:700 11px 'JetBrains Mono',monospace;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--ink-dim);
+  text-align:left;
+  padding:13px 14px;
+  border-bottom:1px solid var(--card-border);
+}
+.compare td{padding:14px;border-bottom:1px solid var(--card-border);color:var(--ink-dim);vertical-align:top}
+.compare td:first-child{color:var(--ink);font-weight:700}
+.summary-band{
+  padding:42px;
+  border:1px solid color-mix(in srgb,var(--accent) 34%,var(--card-border));
+  background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 12%,transparent),rgba(255,255,255,.025));
+  border-radius:6px;
+}
+.summary-band h3{font-family:'Fraunces',serif;font-size:34px;margin-bottom:18px}
+.summary-band li{font-size:18px;color:var(--ink-dim);margin:12px 0}
+@media(max-width:1060px){.pipeline{grid-template-columns:1fr 1fr}.pipe-step:after{display:none}}
+@media(max-width:900px){
+  .stats,.grid-2,.grid-3,.router,.storage-map,.vocab-grid,.pipeline{grid-template-columns:1fr}
+  .stage-header{grid-template-columns:1fr}
+  .route{grid-template-columns:1fr}
 }
 </style>
 </head>
-<body>
-
+<body style="--accent:var(--emerald)">
 <section class="hero">
   <div class="container">
-    <div class="stage-num">The Deep Dive into Retrieval-Augmented Generation</div>
-    <h1>The Science of<br><em>RAG</em></h1>
-    <p class="sub">RAG is like giving an AI an open-book test. But what happens when the book has 10 million pages? We have to master the deep science of <strong>Chunking</strong> (slicing text), <strong>Storage</strong> (Vectors & Graphs), and <strong>Retrieval</strong> (finding the exact needle in the haystack).</p>
+    <div class="stage-num">Advanced RAG lesson for the multi-agent research system</div>
+    <h1 class="display">Hybrid <em>RAG</em></h1>
+    <p class="sub">RAG is the production pattern that lets an AI answer from evidence instead of memory. This lesson explains the full path: classify sources, choose chunking strategies, store meaning and relationships, transform vague questions, retrieve candidates, rerank them, cite them, and evaluate the result with scorecards.</p>
+    <div class="stats">
+      <div class="stat"><div class="num">6</div><div class="label">pipeline stages</div></div>
+      <div class="stat"><div class="num">5</div><div class="label">chunking modes</div></div>
+      <div class="stat"><div class="num">2</div><div class="label">retrieval families</div></div>
+      <div class="stat"><div class="num">1</div><div class="label">grounded answer</div></div>
+    </div>
+    <div class="scroll-hint">Start lesson</div>
   </div>
 </section>
 
-<div class="tabs">
+<nav class="tabs">
   <div class="container">
     <div class="tabs-inner">
-      <button class="tab-btn active" data-tab="chunking">1. Chunking Strategies</button>
-      <button class="tab-btn" data-tab="storage">2. Vector vs. Graph Storage</button>
-      <button class="tab-btn" data-tab="retrieval">3. Advanced Retrieval (HyDE & BM25)</button>
+      <button class="tab-btn active" data-tab="map">System Map</button>
+      <button class="tab-btn" data-tab="chunking">Classification + Chunking</button>
+      <button class="tab-btn" data-tab="storage">Vector + Graph</button>
+      <button class="tab-btn" data-tab="retrieval">Retrieval + Rerank</button>
+      <button class="tab-btn" data-tab="summary">Vocab + Summary</button>
     </div>
   </div>
-</div>
+</nav>
 
-<!-- TAB 1: CHUNKING -->
-<div class="tab-panel active" id="panel-chunking">
-  <section class="stage">
-    <div class="container">
-      <h2 style="color: var(--s2)">The Art of Chunking</h2>
-      <p>Computers have a limited "context window" (working memory). You cannot feed a 500-page PDF into an LLM all at once. You must slice it into small "chunks". But <em>how</em> you slice it determines whether the AI gets brilliant context, or confusing garbage.</p>
-
-      <div class="metaphor-box" style="border-left-color: var(--s2);">
-        <h4>🍕 The Pizza Slicer Metaphor</h4>
-        <p>Imagine trying to slice a pizza while blindfolded. You might cut right through the middle of a pepperoni, or serve a slice that is 100% crust. If you cut a book strictly every 1,000 characters, you will slice a sentence in half, or separate a question from its answer. "Smart Chunking" is taking the blindfold off.</p>
+<main>
+  <div class="tab-panel active" id="panel-map">
+    <section class="stage" style="--accent:var(--emerald)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">01</div>
+          <div>
+            <h2 class="stage-title">RAG is an evidence pipeline, not a search box.</h2>
+            <p class="stage-kicker">The project's RAG folder teaches a production pattern: convert messy sources into structured retrievable evidence, retrieve the best context for a question, then generate facts and references from that context.</p>
+          </div>
+        </div>
+        <div class="pipeline">
+          <div class="pipe-step"><div class="n">1</div><h4>Sources</h4><p>Web snippets, local files, transcripts, notes, logs, and reports enter the pipeline.</p></div>
+          <div class="pipe-step"><div class="n">2</div><h4>Classify</h4><p>The system identifies document shape before choosing a parser.</p></div>
+          <div class="pipe-step"><div class="n">3</div><h4>Chunk</h4><p>Text is split into useful retrieval units with metadata attached.</p></div>
+          <div class="pipe-step"><div class="n">4</div><h4>Index</h4><p>Chunks become embeddings, vector records, and graph relationships.</p></div>
+          <div class="pipe-step"><div class="n">5</div><h4>Retrieve</h4><p>Hybrid search collects semantic, keyword, and relationship candidates.</p></div>
+          <div class="pipe-step"><div class="n">6</div><h4>Rerank</h4><p>A judge selects the most relevant context for the current question.</p></div>
+          <div class="pipe-step"><div class="n">7</div><h4>Answer</h4><p>The system extracts facts, builds references, and returns citations.</p></div>
+        </div>
+        <div class="grid-2">
+          <div class="card accent">
+            <h3>Why this matters</h3>
+            <p>LLMs remember general patterns, but production answers need local facts: your documents, your policies, your research notes, your sources, and your current evidence.</p>
+          </div>
+          <div class="card accent">
+            <h3>What students should notice</h3>
+            <p>The RAG design is modular. Each file owns one responsibility: classification, parsing, storage, indexing, query transformation, retrieval, citation, and evaluation.</p>
+          </div>
+        </div>
       </div>
+    </section>
+  </div>
 
-      <h3>1. Recursive Character Chunking (The Blunt Knife)</h3>
-      <p>This is the most basic method. The system tries to cut the text every 1,000 characters. If that cut lands in the middle of a word, it "recursively" backs up and tries to cut at a space, then at a period, then at a paragraph break.</p>
-      <ul>
-        <li><strong>When to use it:</strong> When you have massive walls of plain text (like an old novel) with no formatting.</li>
-        <li><strong>Why it fails:</strong> If you use this on computer code, it might slice a function in half, rendering the code completely useless.</li>
-      </ul>
-
-      <h3>2. Semantic Chunking (The Mind Reader)</h3>
-      <p>This is highly advanced. Instead of counting letters, the computer converts every sentence into a mathematical vector (a list of numbers). It compares Sentence 1 to Sentence 2. If the math says the topic suddenly changed, it makes a cut.</p>
-      <ul>
-        <li><strong>Analogy:</strong> Think of a movie. You don't pause a movie exactly every 60 seconds. You pause it when a scene ends and the camera cuts to a new location.</li>
-        <li><strong>When to use it:</strong> For meeting transcripts or messy interviews where people change topics randomly.</li>
-      </ul>
-
-      <h3>3. Hierarchical Chunking (The Table of Contents)</h3>
-      <p>Sometimes you need the big picture AND the tiny details. Hierarchical chunking creates a massive "Parent" chunk (e.g., 2,000 words summarizing a chapter) and links it to smaller "Child" chunks (e.g., 200 words explaining one specific paragraph).</p>
-      <ul>
-        <li><strong>When to use it:</strong> For dense legal documents or encyclopedias. If the user asks a broad question, the AI retrieves the Parent. If they ask a hyper-specific question, it retrieves the Child.</li>
-      </ul>
-
-      <div class="deep-dive">
-        <h4>In Our Code (parser.py)</h4>
-        <p>Before we chunk, our <strong>Classifier</strong> looks at the raw text. If it sees HTML tags, it uses an HTML chunker. If it sees markdown (<code>## Headers</code>), it uses a Markdown chunker to keep sections intact. It dynamically chooses the right knife for the job.</p>
+  <div class="tab-panel" id="panel-chunking">
+    <section class="stage" style="--accent:var(--sky)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">02</div>
+          <div>
+            <h2 class="stage-title">Good retrieval starts before the database.</h2>
+            <p class="stage-kicker">The classifier looks at the shape of the content, then routes it to a chunking strategy. This is a production idea: do not treat every document like plain text.</p>
+          </div>
+        </div>
+        <div class="router">
+          <div class="card accent">
+            <h3>The chunking problem</h3>
+            <p>A chunk must be small enough to retrieve cheaply, but large enough to preserve meaning. Bad chunking separates questions from answers, headings from paragraphs, or error messages from their stack traces.</p>
+            <div class="pill-row"><span class="pill">context window</span><span class="pill">metadata</span><span class="pill">overlap</span></div>
+          </div>
+          <div class="route-list">
+            <div class="route"><div class="kind">HTML</div><p>Use structure-aware parsing so navigation, tags, and content blocks do not become noise.</p></div>
+            <div class="route"><div class="kind">Markdown</div><p>Preserve headings, bullet hierarchy, and section boundaries.</p></div>
+            <div class="route"><div class="kind">Transcript</div><p>Use semantic breaks because spoken content changes topics unevenly.</p></div>
+            <div class="route"><div class="kind">Logs</div><p>Use token-based splitting so dense technical traces stay bounded.</p></div>
+            <div class="route"><div class="kind">Reports</div><p>Use hierarchical chunks so broad sections and fine details both remain available.</p></div>
+          </div>
+        </div>
+        <table class="compare">
+          <thead><tr><th>Strategy</th><th>Best for</th><th>Risk it avoids</th></tr></thead>
+          <tbody>
+            <tr><td>Sentence splitting</td><td>Clean prose and simple articles.</td><td>Breaking sentences in unnatural places.</td></tr>
+            <tr><td>Semantic splitting</td><td>Interviews, transcripts, and topic-shifting text.</td><td>Mixing unrelated ideas in one chunk.</td></tr>
+            <tr><td>Hierarchical splitting</td><td>Dense reports, policies, and long references.</td><td>Losing the connection between section and detail.</td></tr>
+            <tr><td>Token splitting</td><td>Logs, traces, and compact technical text.</td><td>Overrunning the model context budget.</td></tr>
+          </tbody>
+        </table>
       </div>
-    </div>
-  </section>
-</div>
+    </section>
+  </div>
 
-<!-- TAB 2: STORAGE -->
-<div class="tab-panel" id="panel-storage">
-  <section class="stage">
-    <div class="container">
-      <h2 style="color: var(--s1)">Vector vs. Graph Storage</h2>
-      <p>Once you have thousands of chunks, where do you put them? A normal database (like an Excel spreadsheet) is useless here, because you can't ask a spreadsheet "Find me paragraphs that feel similar to sadness."</p>
-
-      <h3>1. Vector Databases (ChromaDB)</h3>
-      <p>To a computer, words mean nothing. To make a computer understand meaning, we convert chunks of text into <strong>Embeddings</strong>. An embedding is a list of coordinates (dimensions) that map exactly where a concept lives in a mathematical universe.</p>
-      
-      <div class="metaphor-box" style="border-left-color: var(--s1); background: rgba(14,165,233,0.05);">
-        <h4>🧭 The GPS of Meaning</h4>
-        <p>A physical map has 2 dimensions (Latitude and Longitude). If two cities have similar GPS numbers, they are physically close together. OpenAI's embeddings have <strong>1,536 dimensions!</strong> Instead of mapping physical space, they map meaning. If the vector numbers for "Puppy" and "Dog" are mathematically close, the Vector Database knows they mean the same thing, even if the letters are completely different.</p>
+  <div class="tab-panel" id="panel-storage">
+    <section class="stage" style="--accent:var(--indigo)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">03</div>
+          <div>
+            <h2 class="stage-title">Hybrid storage captures meaning and relationships.</h2>
+            <p class="stage-kicker">The project stores chunks in Chroma for vector search and uses a graph backend for relationship search, falling back gracefully when Neo4j credentials are not available.</p>
+          </div>
+        </div>
+        <div class="storage-map">
+          <div class="store-box vector">
+            <h3>Vector database</h3>
+            <p>Embeddings turn text into coordinates. Nearby vectors usually mean nearby meaning, so a question about "repairing an engine" can find text about "fixing a motor."</p>
+            <div class="dots">
+              <div class="dot"></div><div class="dot" style="opacity:.35"></div><div class="dot" style="opacity:.9"></div><div class="dot" style="opacity:.5"></div>
+              <div class="dot" style="opacity:.7"></div><div class="dot" style="opacity:.25"></div><div class="dot" style="opacity:.85"></div><div class="dot" style="opacity:.45"></div>
+              <div class="dot" style="opacity:.4"></div><div class="dot" style="opacity:.75"></div><div class="dot" style="opacity:.55"></div><div class="dot" style="opacity:.95"></div>
+              <div class="dot" style="opacity:.3"></div><div class="dot" style="opacity:.65"></div><div class="dot" style="opacity:.48"></div><div class="dot" style="opacity:.8"></div>
+            </div>
+            <div class="pill-row"><span class="pill">semantic search</span><span class="pill">similarity</span><span class="pill">embeddings</span></div>
+          </div>
+          <div class="store-box graph">
+            <h3>Graph database</h3>
+            <p>Graphs store entities and relationships. They help answer multi-hop questions where the connection matters more than word similarity.</p>
+            <div class="nodes">
+              <div class="edge" style="left:105px;top:58px;width:150px;transform:rotate(10deg)"></div>
+              <div class="edge" style="left:250px;top:88px;width:145px;transform:rotate(24deg)"></div>
+              <div class="edge" style="left:120px;top:130px;width:170px;transform:rotate(-18deg)"></div>
+              <div class="node" style="left:30px;top:38px">Person</div>
+              <div class="node" style="left:240px;top:58px">Company</div>
+              <div class="node" style="left:405px;top:124px">Product</div>
+              <div class="node" style="left:160px;top:140px">Policy</div>
+            </div>
+            <div class="pill-row"><span class="pill">nodes</span><span class="pill">edges</span><span class="pill">multi-hop</span></div>
+          </div>
+        </div>
+        <div class="card accent" style="margin-top:24px">
+          <h3>Production robustness</h3>
+          <p>The storage layer is built to degrade gracefully. If the graph database is configured, the system uses it. If not, it falls back to a simple local graph store so the learning demo still works.</p>
+        </div>
       </div>
-      
-      <ul>
-        <li><strong>How many dimensions is better?</strong> Older models used 384 dimensions. Newer ones use 1,536 or 3,072. More dimensions mean the AI understands deeper nuances (e.g., the difference between a "bank" for money and a river "bank"). However, higher dimensions cost more money and take longer to search.</li>
-        <li><strong>When to use Vector DBs:</strong> When you need to match the "vibe" or semantic meaning of a question, not the exact words.</li>
-      </ul>
+    </section>
+  </div>
 
-      <h3>2. Graph Databases (Neo4j)</h3>
-      <p>Graph Databases were born out of a massive failure in old SQL databases. In the early 2000s, social networks like Facebook realized that standard row-and-column databases were terrible at answering questions like: <em>"Find friends of friends who also like pizza."</em></p>
-      <p>A Graph Database doesn't use tables. It uses <strong>Nodes</strong> (nouns, like 'Company' or 'Person') and <strong>Edges</strong> (verbs, like 'OWNS' or 'IS_FRIENDS_WITH').</p>
-      
-      <ul>
-        <li><strong>Why do we need Graph in RAG?</strong> Vector databases are blind to logic. If A owns B, and B owns C, a Vector DB doesn't realize that A owns C. A Graph DB can easily trace that path (multi-hop reasoning).</li>
-        <li><strong>When to use Graph DBs:</strong> For complex reasoning, family trees, corporate ownership, or tracking characters in a massive novel.</li>
-      </ul>
-
-      <div class="deep-dive">
-        <h4 style="color:var(--s1)">In Our Code (store.py)</h4>
-        <p>We use a <strong>Hybrid</strong> approach. We save the text in ChromaDB for semantic matching, and we save the relationships in Neo4j. If Neo4j crashes, our code automatically degrades to a simple local graph so the application never breaks.</p>
+  <div class="tab-panel" id="panel-retrieval">
+    <section class="stage" style="--accent:var(--violet)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">04</div>
+          <div>
+            <h2 class="stage-title">Retrieval improves the question before searching.</h2>
+            <p class="stage-kicker">Users ask short, vague questions. The system uses HyDE, vector search, BM25 keyword search, graph lookup, reciprocal reranking, and LLM reranking to narrow many candidates into the best few contexts.</p>
+          </div>
+        </div>
+        <div class="pipeline">
+          <div class="pipe-step"><div class="n">Q</div><h4>User query</h4><p>The raw question may be ambiguous, incomplete, or use different vocabulary.</p></div>
+          <div class="pipe-step"><div class="n">H</div><h4>HyDE</h4><p>Generate a hypothetical answer-shaped document to search by meaning.</p></div>
+          <div class="pipe-step"><div class="n">V</div><h4>Vector</h4><p>Find semantically similar chunks even when words differ.</p></div>
+          <div class="pipe-step"><div class="n">B</div><h4>BM25</h4><p>Find exact names, identifiers, and keyword matches.</p></div>
+          <div class="pipe-step"><div class="n">G</div><h4>Graph</h4><p>Find relationship-based evidence when entities connect across hops.</p></div>
+          <div class="pipe-step"><div class="n">F</div><h4>Fusion</h4><p>Merge candidates so no single retrieval method dominates unfairly.</p></div>
+          <div class="pipe-step"><div class="n">R</div><h4>Rerank</h4><p>Select only the top context chunks for the answer writer.</p></div>
+        </div>
+        <div class="grid-3">
+          <div class="card accent"><h3>BM25</h3><p>Great for exact terms such as product names, error codes, file names, law names, and IDs.</p></div>
+          <div class="card accent"><h3>Vector search</h3><p>Great for meaning, paraphrases, concept matching, and questions that use different wording from the source.</p></div>
+          <div class="card accent"><h3>LLM rerank</h3><p>Great for final selection because it compares the question against candidate chunks directly.</p></div>
+        </div>
+        <div class="card accent" style="margin-top:24px">
+          <h3>Citations complete the trust loop</h3>
+          <p>Retrieval is not only about feeding the model. It also gives users and evaluators a way to inspect where the answer came from. Citations make the answer auditable.</p>
+        </div>
+        <div class="card accent" style="margin-top:24px">
+          <h3>Ragas-style evaluation</h3>
+          <p>After retrieval and answer generation, the system can score whether the answer is faithful to the retrieved context, whether the context was relevant, and whether the answer is supported by evidence. This turns RAG quality into a measurable report instead of a feeling.</p>
+        </div>
       </div>
-    </div>
-  </section>
-</div>
+    </section>
+  </div>
 
-<!-- TAB 3: RETRIEVAL -->
-<div class="tab-panel" id="panel-retrieval">
-  <section class="stage">
-    <div class="container">
-      <h2 style="color: var(--s4)">Advanced Retrieval & Reranking</h2>
-      <p>We have our chunked data. We have our databases. Now, a user types a search query. But users write terrible, vague queries. If we just search for what they typed, we will get garbage back.</p>
-
-      <h3>1. BM25 (The Classic Keyword Search)</h3>
-      <p>BM25 is a mathematical algorithm invented in the 1970s. It stands for "Best Matching 25". It is a pure, hardcore keyword search.</p>
-      <ul>
-        <li><strong>Why use old tech?</strong> Vector DBs are great at meaning, but terrible at exact names. If you search a Vector DB for "John Doe", it might return "Jane Smith" because they are both generic names. BM25 looks for the exact letters "J-o-h-n D-o-e". We combine BM25 and Vector Search to get the best of both worlds.</li>
-      </ul>
-
-      <h3>2. Multi-Query Expansion</h3>
-      <p>If a user searches for <em>"fix engine"</em>, we don't send that to the database. We secretly ask a fast LLM to rewrite it into 3 better questions: <em>"How to repair a car engine?"</em>, <em>"Troubleshooting engine failure"</em>, and <em>"Engine maintenance guide."</em> We search the database using all 3!</p>
-
-      <h3>3. HyDE (Hypothetical Document Embeddings)</h3>
-      <p>This is a brilliant trick. When the user asks a question, we ask the LLM to <strong>hallucinate a fake, perfect answer</strong>. It doesn't have to be true; it just has to *look* like a textbook paragraph. We then turn that fake answer into a vector, and search the database for real documents that look mathematically identical to the fake answer.</p>
-      <div class="metaphor-box" style="border-left-color: var(--s4); background: rgba(139,92,246,0.05);">
-        <h4>🕵️‍♂️ The Police Sketch</h4>
-        <p>HyDE is like a police sketch artist. You don't have a photo of the suspect (the real answer), so you describe what they look like (the fake answer). The police use that sketch to search the city and find the real person who matches it perfectly.</p>
+  <div class="tab-panel" id="panel-summary">
+    <section class="stage" style="--accent:var(--amber)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">05</div>
+          <div>
+            <h2 class="stage-title">Vocabulary and final recap.</h2>
+            <p class="stage-kicker">These terms let students explain the RAG system like engineers instead of treating it as magic.</p>
+          </div>
+        </div>
+        <div class="vocab-grid">
+          <div class="term"><div class="word">RAG</div><p>Retrieval-Augmented Generation: answering with retrieved evidence instead of only model memory.</p></div>
+          <div class="term"><div class="word">Chunk</div><p>A retrievable piece of a document, sized to preserve meaning and fit context limits.</p></div>
+          <div class="term"><div class="word">Metadata</div><p>Extra information such as title, URL, category, and chunking strategy attached to each chunk.</p></div>
+          <div class="term"><div class="word">Embedding</div><p>A numerical representation of text meaning used for similarity search.</p></div>
+          <div class="term"><div class="word">Vector DB</div><p>A database optimized for finding nearby embeddings.</p></div>
+          <div class="term"><div class="word">Graph DB</div><p>A database optimized for entities, relationships, and multi-hop reasoning.</p></div>
+          <div class="term"><div class="word">BM25</div><p>A keyword ranking method that rewards exact term matches and useful word frequency.</p></div>
+          <div class="term"><div class="word">HyDE</div><p>A query transform that creates a hypothetical answer document to improve semantic retrieval.</p></div>
+          <div class="term"><div class="word">Reranking</div><p>Scoring candidate chunks again so only the most relevant context reaches the final answer.</p></div>
+          <div class="term"><div class="word">Ragas</div><p>A family of RAG evaluation ideas for scoring faithfulness, context relevance, and answer quality.</p></div>
+        </div>
+        <div class="summary-band" style="margin-top:32px">
+          <h3>Final summary</h3>
+          <ul>
+            <li>RAG turns messy knowledge into searchable evidence for an LLM.</li>
+            <li>Classification matters because HTML, Markdown, transcripts, logs, and reports need different chunking strategies.</li>
+            <li>Vector search finds meaning; BM25 finds exact terms; graph retrieval finds relationships.</li>
+            <li>HyDE and query transformation help when the user's question is vague or uses different language from the source.</li>
+            <li>Reranking, citations, and Ragas-style scorecards make the final answer more relevant, cheaper, and easier to audit.</li>
+          </ul>
+        </div>
       </div>
-
-      <h3>4. LLM Reranking (The Final Judge)</h3>
-      <p>Because we used BM25, Multi-Query, and HyDE, our search engine might return 30 possible chunks. We cannot feed 30 chunks to the final AI (it would cause "context window" overflow and cost a fortune).</p>
-      <p>We pass all 30 chunks to a fast "Judge LLM". It reads the user's question, reads the 30 chunks, and scores each chunk from 0.0 to 1.0 based on relevance. It throws out the junk, and only passes the <strong>top 3 absolute best chunks</strong> to the final writer.</p>
-
-      <div class="deep-dive">
-        <h4 style="color:var(--s4)">In Our Code (retriever.py)</h4>
-        <p>Our `QueryFusionRetriever` handles the BM25 + Vector blending. We use `LLMRerank` to act as the final judge. This massive pipeline guarantees that the AI never hallucinates, because it is always fed pure, high-quality, relevant facts.</p>
-      </div>
-    </div>
-  </section>
-</div>
+    </section>
+  </div>
+</main>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const buttons = document.querySelectorAll('.tab-btn');
   const panels = document.querySelectorAll('.tab-panel');
-
   buttons.forEach(button => {
     button.addEventListener('click', () => {
-      const targetTab = button.getAttribute('data-tab');
-
+      const tab = button.dataset.tab;
       buttons.forEach(btn => btn.classList.remove('active'));
       panels.forEach(panel => panel.classList.remove('active'));
-
       button.classList.add('active');
-      document.getElementById(`panel-${targetTab}`).classList.add('active');
-      
-      if(targetTab === 'chunking') {
-        button.style.backgroundColor = 'rgba(16,185,129,0.2)';
-        button.style.borderColor = 'var(--s2)';
-      } else if (targetTab === 'storage') {
-        button.style.backgroundColor = 'rgba(14,165,233,0.2)';
-        button.style.borderColor = 'var(--s1)';
-      } else {
-        button.style.backgroundColor = 'rgba(139,92,246,0.2)';
-        button.style.borderColor = 'var(--s4)';
-      }
+      document.getElementById(`panel-${tab}`).classList.add('active');
+      window.scrollTo({top: document.querySelector('.tabs').offsetTop, behavior: 'smooth'});
     });
   });
 });
 </script>
-
 </body>
 </html>

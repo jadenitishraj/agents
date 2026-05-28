@@ -3,347 +3,489 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Deep Dive into AI Evaluation · Visual Lesson</title>
+<title>Agent Evaluation - Production AI Quality Gates</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg: #0a0a14;
-  --ink: #f4f1ea;
-  --ink-dim: #a8a3b8;
-  --ink-faint: #5a5670;
-
-  --s2: #ec4899; /* Fuchsia */
-  --s7: #f97316; /* Orange */
-  --s8: #facc15; /* Amber */
-
-  --card-bg: rgba(255,255,255,0.03);
-  --card-border: rgba(255,255,255,0.08);
+:root{
+  --bg:#0a0a14;
+  --ink:#f4f1ea;
+  --ink-dim:#aaa5b8;
+  --ink-faint:#625d76;
+  --pink:#ec4899;
+  --rose:#e11d48;
+  --orange:#f97316;
+  --amber:#facc15;
+  --teal:#14b8a6;
+  --blue:#38bdf8;
+  --green:#22c55e;
+  --card-bg:rgba(255,255,255,0.035);
+  --card-border:rgba(255,255,255,0.09);
+  --panel:rgba(255,255,255,0.025);
 }
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-body {
-  font-family: 'Inter Tight', sans-serif;
-  background: var(--bg);
-  color: var(--ink);
-  line-height: 1.7;
-  overflow-x: hidden;
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Inter Tight',sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  line-height:1.6;
+  overflow-x:hidden;
   background-image:
-    radial-gradient(ellipse at top, rgba(236,72,153,0.12), transparent 50%),
-    radial-gradient(ellipse at bottom, rgba(249,115,22,0.08), transparent 50%);
-  background-attachment: fixed;
+    radial-gradient(ellipse at top left,rgba(236,72,153,.16),transparent 42%),
+    radial-gradient(ellipse at bottom right,rgba(249,115,22,.11),transparent 46%);
+  background-attachment:fixed;
 }
-
-.container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 0 32px;
-  position: relative;
-  z-index: 2;
+body:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:1;
+  opacity:.33;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
 }
-
-/* === Typography === */
-.serif { font-family: 'Fraunces', serif; }
-.mono { font-family: 'JetBrains Mono', monospace; }
-
-/* === Hero === */
-.hero {
-  min-height: 60vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 80px 0 60px;
+.container{max-width:1280px;margin:0 auto;padding:0 32px;position:relative;z-index:2}
+.display{font-family:'Fraunces',serif;font-weight:900;letter-spacing:-.04em;line-height:.95}
+.serif{font-family:'Fraunces',serif}
+.mono{font-family:'JetBrains Mono',monospace}
+.label{
+  font-family:'JetBrains Mono',monospace;
+  text-transform:uppercase;
+  letter-spacing:.18em;
+  font-size:11px;
+  color:var(--ink-dim);
 }
-.hero .stage-num {
-  font-family: 'Fraunces', serif;
-  font-style: italic;
-  font-size: 16px;
-  color: var(--ink-faint);
-  margin-bottom: 24px;
+.hero{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:80px 0 60px;
+  position:relative;
 }
-.hero h1 {
-  font-size: clamp(40px, 7vw, 80px);
-  margin-bottom: 24px;
-  background: linear-gradient(135deg, var(--s2) 0%, var(--s7) 50%, var(--s8) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-family: 'Fraunces', serif;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
+.hero .stage-num{
+  font-family:'Fraunces',serif;
+  font-style:italic;
+  font-weight:300;
+  font-size:14px;
+  color:var(--ink-faint);
+  margin-bottom:24px;
 }
-.hero .sub {
-  font-size: 20px;
-  color: var(--ink-dim);
-  margin-bottom: 30px;
-  font-weight: 300;
-  line-height: 1.6;
+.hero h1{
+  font-size:clamp(48px,9vw,124px);
+  margin-bottom:32px;
+  background:linear-gradient(135deg,var(--pink),var(--orange),var(--amber));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
 }
-
-/* === Tab bar === */
-.tabs {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: rgba(10,10,20,0.9);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--card-border);
-  padding: 16px 0;
+.hero h1 em{font-style:italic;font-weight:300;color:var(--ink);-webkit-text-fill-color:var(--ink)}
+.hero .sub{
+  font-size:clamp(18px,2.2vw,24px);
+  max-width:790px;
+  color:var(--ink-dim);
+  margin-bottom:52px;
+  font-weight:300;
 }
-.tabs-inner {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;max-width:1000px}
+.stat{border-left:2px solid var(--card-border);padding-left:16px}
+.stat .num{font-family:'Fraunces',serif;font-size:36px;font-weight:800;letter-spacing:-.03em}
+.stat .label{margin-top:4px}
+.scroll-hint{
+  position:absolute;
+  bottom:36px;
+  left:50%;
+  transform:translateX(-50%);
+  color:var(--ink-faint);
+  font-size:11px;
+  letter-spacing:.3em;
+  text-transform:uppercase;
+  animation:bob 2s ease-in-out infinite;
 }
-.tab-btn {
-  font-family: 'Inter Tight', sans-serif;
-  font-size: 15px;
-  padding: 12px 24px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--card-border);
-  border-radius: 6px;
-  color: var(--ink-dim);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: 500;
+@keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,8px)}}
+.tabs{
+  position:sticky;
+  top:0;
+  z-index:50;
+  background:rgba(10,10,20,.91);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--card-border);
+  padding:14px 0;
 }
-.tab-btn:hover {
-  color: var(--ink);
-  background: rgba(255,255,255,0.05);
+.tabs-inner{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.tab-btn{
+  font:600 12px 'JetBrains Mono',monospace;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  padding:11px 14px;
+  background:rgba(255,255,255,.025);
+  border:1px solid var(--card-border);
+  border-radius:4px;
+  color:var(--ink-dim);
+  cursor:pointer;
 }
-.tab-btn.active {
-  color: #fff;
-  border-color: var(--s2);
-  background: rgba(236,72,153,0.2);
+.tab-btn:hover{color:var(--ink);background:rgba(255,255,255,.055)}
+.tab-btn.active{color:#fff;border-color:var(--accent);background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.tab-panel{display:none}
+.tab-panel.active{display:block;animation:fadeIn .35s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.stage{padding:96px 0;border-top:1px solid var(--card-border)}
+.stage-header{display:grid;grid-template-columns:80px 1fr;gap:24px;margin-bottom:48px;align-items:start}
+.stage-num-big{
+  font-family:'Fraunces',serif;
+  font-style:italic;
+  font-size:64px;
+  line-height:1;
+  color:var(--accent);
+  font-weight:300;
 }
-
-/* === Tab panel === */
-.tab-panel { display: none; }
-.tab-panel.active { display: block; animation: fadeIn 0.4s ease; }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+.stage-title{
+  font-family:'Fraunces',serif;
+  font-weight:800;
+  font-size:clamp(34px,5vw,58px);
+  letter-spacing:-.03em;
+  line-height:1.05;
+  margin-bottom:12px;
 }
-
-/* === Stages & Content === */
-.stage { padding: 60px 0; border-bottom: 1px solid var(--card-border); }
-.stage h2 {
-  font-family: 'Fraunces', serif;
-  font-size: 36px;
-  margin-bottom: 24px;
-  color: var(--s2);
-  letter-spacing: -0.02em;
+.stage-kicker{font-size:18px;color:var(--ink-dim);font-weight:300;max-width:850px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.card{
+  background:var(--card-bg);
+  border:1px solid var(--card-border);
+  border-radius:6px;
+  padding:28px;
+  backdrop-filter:blur(10px);
 }
-.stage h3 {
-  font-family: 'Inter Tight', sans-serif;
-  font-size: 24px;
-  font-weight: 600;
-  margin: 40px 0 16px;
-  color: #fff;
+.card.accent{border-left:3px solid var(--accent)}
+.card h3,.card h4{font-family:'Fraunces',serif;font-size:25px;line-height:1.1;margin-bottom:12px}
+.card p,.card li{color:var(--ink-dim);font-size:17px;font-weight:300}
+.card ul{margin:14px 0 0 20px}
+.card li{margin-bottom:10px}
+.strong{color:var(--ink);font-weight:600}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
+.pill{
+  font:700 11px 'JetBrains Mono',monospace;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 13%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
+  border-radius:4px;
+  padding:7px 9px;
 }
-.stage p {
-  font-size: 18px;
-  color: var(--ink-dim);
-  margin-bottom: 20px;
-  font-weight: 300;
+.flow{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:10px;
+  margin:32px 0;
 }
-.stage ul {
-  margin: 0 0 20px 24px;
-  color: var(--ink-dim);
-  font-size: 18px;
-  font-weight: 300;
+.flow-step{
+  min-height:132px;
+  padding:18px;
+  border:1px solid var(--card-border);
+  background:var(--panel);
+  border-radius:6px;
+  position:relative;
 }
-.stage li { margin-bottom: 12px; }
-.stage strong { color: var(--ink); font-weight: 600; }
-
-/* === Metaphor Box === */
-.metaphor-box {
-  background: rgba(236,72,153,0.05);
-  border-left: 5px solid var(--s2);
-  padding: 30px;
-  border-radius: 0 12px 12px 0;
-  margin: 40px 0;
+.flow-step:after{
+  content:"";
+  position:absolute;
+  right:-10px;
+  top:50%;
+  width:10px;
+  height:1px;
+  background:var(--card-border);
 }
-.metaphor-box h4 {
-  font-family: 'Fraunces', serif;
-  font-size: 24px;
-  color: #fff;
-  margin-bottom: 12px;
+.flow-step:last-child:after{display:none}
+.flow-step .n{font:800 12px 'JetBrains Mono',monospace;color:var(--accent);margin-bottom:8px}
+.flow-step h4{font-size:19px;margin-bottom:8px}
+.flow-step p{font-size:15px;color:var(--ink-dim)}
+.matrix{width:100%;border-collapse:separate;border-spacing:0;font-size:15px;margin-top:12px}
+.matrix th{
+  font:700 11px 'JetBrains Mono',monospace;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--ink-dim);
+  text-align:left;
+  padding:13px 14px;
+  border-bottom:1px solid var(--card-border);
 }
-.metaphor-box p { font-size: 18px; color: var(--ink); margin-bottom: 0; }
-
-/* === Deep Dive Box === */
-.deep-dive {
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  padding: 30px;
-  margin: 30px 0;
+.matrix td{padding:14px;border-bottom:1px solid var(--card-border);color:var(--ink-dim);vertical-align:top}
+.matrix td:first-child{color:var(--ink);font-weight:700}
+.score{
+  display:grid;
+  grid-template-columns:120px 1fr 92px;
+  gap:14px;
+  align-items:center;
+  margin:18px 0;
 }
-.deep-dive h4 {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  text-transform: uppercase;
-  color: var(--s2);
-  letter-spacing: 0.1em;
-  margin-bottom: 16px;
+.track{height:22px;background:rgba(255,255,255,.055);border-radius:3px;overflow:hidden}
+.fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--amber))}
+.score .name,.score .val{font:700 13px 'JetBrains Mono',monospace;color:var(--ink)}
+.judge{
+  display:grid;
+  grid-template-columns:1fr 1.1fr 1fr;
+  gap:18px;
+  align-items:stretch;
+  margin-top:24px;
+}
+.judge-box{
+  padding:22px;
+  border:1px solid var(--card-border);
+  background:rgba(0,0,0,.22);
+  border-radius:6px;
+}
+.judge-box.center{border-color:color-mix(in srgb,var(--accent) 45%,var(--card-border));box-shadow:0 0 40px color-mix(in srgb,var(--accent) 10%,transparent)}
+.judge-box h4{font:800 20px 'Fraunces',serif;margin-bottom:8px}
+.judge-box p{font-size:16px;color:var(--ink-dim)}
+.vocab-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.term{
+  padding:18px;
+  border:1px solid var(--card-border);
+  border-radius:5px;
+  background:rgba(255,255,255,.025);
+}
+.term .word{font:800 13px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.term p{font-size:15px;color:var(--ink-dim)}
+.summary-band{
+  padding:42px;
+  border:1px solid color-mix(in srgb,var(--accent) 34%,var(--card-border));
+  background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 12%,transparent),rgba(255,255,255,.025));
+  border-radius:6px;
+}
+.summary-band h3{font-family:'Fraunces',serif;font-size:34px;margin-bottom:18px}
+.summary-band li{font-size:18px;color:var(--ink-dim);margin:12px 0}
+@media(max-width:900px){
+  .stats,.grid-2,.grid-3,.flow,.judge,.vocab-grid{grid-template-columns:1fr}
+  .stage-header{grid-template-columns:1fr}
+  .flow-step:after{display:none}
+  .score{grid-template-columns:1fr}
 }
 </style>
 </head>
-<body>
-
+<body style="--accent:var(--pink)">
 <section class="hero">
   <div class="container">
-    <div class="stage-num">The Deep Dive into AI Evaluation & Testing</div>
-    <h1>The Science of<br><em>Auditing AI</em></h1>
-    <p class="sub">Writing an AI agent takes an hour. Proving that it won't hallucinate facts, break privacy laws, or waste thousands of dollars in computing costs takes a professional testing framework. Welcome to the deep science of automated AI evaluation.</p>
+    <div class="stage-num">Production lesson for the multi-agent research system</div>
+    <h1 class="display">Agent <em>Evaluation</em></h1>
+    <p class="sub">Students should leave this lesson understanding that an AI answer is not finished when it sounds fluent. It is finished when factual, semantic, safety, compliance, and operational quality gates all pass.</p>
+    <div class="stats">
+      <div class="stat"><div class="num">5</div><div class="label">quality gates</div></div>
+      <div class="stat"><div class="num">2</div><div class="label">regulatory lenses</div></div>
+      <div class="stat"><div class="num">1</div><div class="label">live agent trace</div></div>
+      <div class="stat"><div class="num">0</div><div class="label">blind trust</div></div>
+    </div>
+    <div class="scroll-hint">Start lesson</div>
   </div>
 </section>
 
-<div class="tabs">
+<nav class="tabs">
   <div class="container">
     <div class="tabs-inner">
-      <button class="tab-btn active" data-tab="factual">1. The Death of Exact Match</button>
-      <button class="tab-btn" data-tab="regulatory">2. Enforcing Global AI Laws</button>
-      <button class="tab-btn" data-tab="operational">3. Live LangGraph Tracing</button>
+      <button class="tab-btn active" data-tab="mental">Mental Model</button>
+      <button class="tab-btn" data-tab="metrics">Metric Gates</button>
+      <button class="tab-btn" data-tab="compliance">Compliance</button>
+      <button class="tab-btn" data-tab="trace">Live Trace</button>
+      <button class="tab-btn" data-tab="summary">Vocab + Summary</button>
     </div>
   </div>
-</div>
+</nav>
 
-<!-- TAB 1: FACTUAL GATES -->
-<div class="tab-panel active" id="panel-factual">
-  <section class="stage">
-    <div class="container">
-      <h2 style="color: var(--s2)">Factual Integrity: The Death of Exact Match</h2>
-      <p>For decades, programmers tested software using "Unit Tests". The rule was simple: <code>if output == expected: pass</code>. When AI generates dynamic, human-like paragraphs, that rigid old-school testing completely shatters.</p>
-
-      <div class="metaphor-box" style="border-left-color: var(--s2);">
-        <h4>📝 The Smart Teacher vs. The Dumb Computer</h4>
-        <p>If the expected truth is <em>"The sky is blue"</em>, and the AI generates <em>"It appears that the sky has an azure tint"</em>, an old-school NLP metric (like BLEU or ROUGE) gives a score of 0% because the letters don't overlap. It grades like a dumb computer. We need a system that grades like a Smart Teacher, understanding meaning over syntax.</p>
+<main>
+  <div class="tab-panel active" id="panel-mental">
+    <section class="stage" style="--accent:var(--pink)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">01</div>
+          <div>
+            <h2 class="stage-title">Evaluation is a quality control system.</h2>
+            <p class="stage-kicker">A normal app test asks, "did the function return the expected value?" An agent evaluation asks a harder question: "did a moving multi-step system produce a useful, grounded, safe, and efficient result?"</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="flow-step"><div class="n">INPUT</div><h4>User question</h4><p>The original task, including hidden complexity such as multiple requirements or sensitive topics.</p></div>
+          <div class="flow-step"><div class="n">RUN</div><h4>Agent pipeline</h4><p>Planner, Searcher, Reader, Writer, Critic, and optional Compliance collaborate.</p></div>
+          <div class="flow-step"><div class="n">STATE</div><h4>Evidence trail</h4><p>The run produces sources, facts, iterations, LLM calls, duration, and a final answer.</p></div>
+          <div class="flow-step"><div class="n">JUDGE</div><h4>Evaluation suite</h4><p>Specialized metrics grade different failure modes instead of using one vague score.</p></div>
+          <div class="flow-step"><div class="n">GATE</div><h4>Pass or fail</h4><p>Production systems should block release when critical quality gates fail.</p></div>
+        </div>
+        <div class="grid-2">
+          <div class="card accent">
+            <h3>Why exact match breaks</h3>
+            <p>AI can answer correctly using different words. "Python is readable and versatile" and "Python is a flexible language known for clarity" are not identical strings, but they may be semantically equivalent.</p>
+            <div class="pill-row"><span class="pill">Exact match is brittle</span><span class="pill">Meaning matters</span></div>
+          </div>
+          <div class="card accent">
+            <h3>Why one score is dangerous</h3>
+            <p>A response can be fluent but unsupported, factually correct but non-compliant, compliant but incomplete, or complete but wastefully expensive. Production evaluation separates these dimensions.</p>
+            <div class="pill-row"><span class="pill">Separate risks</span><span class="pill">Separate gates</span></div>
+          </div>
+        </div>
       </div>
+    </section>
+  </div>
 
-      <h3>1. G-Eval (The LLM-as-a-Judge)</h3>
-      <p>Instead of counting overlapping words, we use a technique called <strong>G-Eval</strong>. We take the AI's answer, and we hand it to a massive frontier model (like GPT-4) along with a grading rubric.</p>
-      <ul>
-        <li><strong>How it works:</strong> The rubric says: <em>"Score this from 1 to 5 based on whether it preserves the semantic meaning of the expected answer."</em> The Judge LLM reads both, understands the nuances of human language, and outputs a highly accurate score.</li>
-        <li><strong>Why it's revolutionary:</strong> It allows us to mathematically score creativity, tone, and factual alignment without punishing the AI for using different synonyms.</li>
-      </ul>
-
-      <h3>2. The Difference Between Hallucination and Faithfulness</h3>
-      <p>People use these two words interchangeably, but in AI evaluation, they measure two very different points of failure:</p>
-      <ul>
-        <li><strong>Hallucination:</strong> Did the AI make up general gossip? We grade the AI's final answer against the massive source documents. If the source documents mention "Apples" and the AI talks about "Oranges", it hallucinated.</li>
-        <li><strong>Faithfulness:</strong> Did the AI lie about the *specific facts* we handed to it? In RAG, we extract bullet points from the text. Faithfulness measures if the AI stayed 100% loyal to those bullet points without exaggerating them. It checks if the AI is a reliable witness.</li>
-      </ul>
-
-      <div class="deep-dive">
-        <h4 style="color:var(--s2)">In Our Code (lexical_code.py)</h4>
-        <p>We use the DeepEval library to run these G-Eval checks automatically. We also run a <code>Code Correctness</code> check. If the user asked for Python code, the judge verifies that the code is enclosed in proper markdown backticks and structurally sound, without executing dangerous raw code on our servers.</p>
+  <div class="tab-panel" id="panel-metrics">
+    <section class="stage" style="--accent:var(--orange)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">02</div>
+          <div>
+            <h2 class="stage-title">Each metric catches a different failure.</h2>
+            <p class="stage-kicker">Your project uses DeepEval-style metrics and G-Eval rubrics to evaluate lexical alignment, code correctness, hallucination, and faithfulness. The important teaching point is not the library call; it is the production habit of mapping every risk to a measurable gate.</p>
+          </div>
+        </div>
+        <table class="matrix">
+          <thead><tr><th>Gate</th><th>What it asks</th><th>Failure example</th><th>Production action</th></tr></thead>
+          <tbody>
+            <tr><td>Exact Match</td><td>Is the output literally identical to the expected answer?</td><td>Correct paraphrases fail because wording changed.</td><td>Use sparingly for IDs, labels, and deterministic outputs.</td></tr>
+            <tr><td>Semantic Alignment</td><td>Does the answer preserve the required meaning?</td><td>The answer sounds polished but misses the main use cases.</td><td>Use a rubric-based judge for open-ended text.</td></tr>
+            <tr><td>Code Correctness</td><td>If code is requested, is it structurally complete and sensible?</td><td>The answer gives placeholders instead of working logic.</td><td>Fail the response before students or users copy broken code.</td></tr>
+            <tr><td>Hallucination</td><td>Did the answer invent claims outside the available context?</td><td>The source says "used for automation"; the answer claims "invented by Google."</td><td>Block or rewrite unsupported claims.</td></tr>
+            <tr><td>Faithfulness</td><td>Does the answer stay loyal to the retrieved facts?</td><td>A fact says "often used"; the answer exaggerates to "always used."</td><td>Keep the writer grounded in evidence.</td></tr>
+          </tbody>
+        </table>
+        <div class="judge">
+          <div class="judge-box"><h4>Answer</h4><p>The final text from the agent team. It may be fluent, confident, and still wrong.</p></div>
+          <div class="judge-box center"><h4>Judge rubric</h4><p>A clear natural-language grading instruction turns fuzzy quality into repeatable evaluation.</p></div>
+          <div class="judge-box"><h4>Evidence</h4><p>Expected answer, retrieved snippets, extracted facts, and original user input anchor the judgment.</p></div>
+        </div>
+        <div class="card accent" style="margin-top:24px">
+          <h3>DeepEval and G-Eval in plain English</h3>
+          <p>DeepEval is the evaluation harness: it organizes test cases, metrics, scores, pass/fail decisions, and reasons. G-Eval is the rubric-driven judge pattern: it asks a model to grade an open-ended answer against explicit criteria.</p>
+        </div>
+        <div class="card accent" style="margin-top:24px">
+          <h3>Threshold thinking</h3>
+          <div class="score"><div class="name">Hallucination</div><div class="track"><div class="fill" style="width:30%"></div></div><div class="val">lower wins</div></div>
+          <div class="score"><div class="name">Faithfulness</div><div class="track"><div class="fill" style="width:60%"></div></div><div class="val">higher wins</div></div>
+          <div class="score"><div class="name">Compliance</div><div class="track"><div class="fill" style="width:90%"></div></div><div class="val">strict gate</div></div>
+          <p>Thresholds are product decisions. A classroom demo can tolerate softer gates; a healthcare, finance, legal, or identity workflow needs stricter gates and human review.</p>
+        </div>
       </div>
-    </div>
-  </section>
-</div>
+    </section>
+  </div>
 
-<!-- TAB 2: REGULATORY COMPLIANCE -->
-<div class="tab-panel" id="panel-regulatory">
-  <section class="stage">
-    <div class="container">
-      <h2 style="color: var(--s7)">Enforcing Global AI Laws</h2>
-      <p>Code is no longer just logic; it is liability. In 2024, the European Union passed the world's first comprehensive AI law, and India enacted strict data privacy rules. If your AI violates them in production, your company faces massive fines.</p>
-
-      <h3>1. The EU AI Act (Risk Tiers)</h3>
-      <p>The EU AI Act categorizes AI into risk tiers: Unacceptable Risk, High Risk, Limited Risk, and Minimal Risk. Systems that pose an "Unacceptable Risk" are banned outright.</p>
-      <ul>
-        <li><strong>What we audit for:</strong> Our evaluation system uses a strict G-Eval rubric to scan every single output for <em>Subliminal Manipulation</em> (tricking users), <em>Emotion Recognition in Workplaces</em>, and <em>Social Scoring</em>. If the AI output tries to judge a person's worth based on their behavior, the evaluation forcefully fails the test.</li>
-      </ul>
-      
-      <div class="metaphor-box" style="border-left-color: var(--s7); background: rgba(249,115,22,0.05);">
-        <h4>⚖️ The Legal Inspector</h4>
-        <p>Imagine deploying a customer service bot. A user asks, "Am I a good person?" If the AI responds by analyzing their chat history and assigning them a "morality score of 4/10", you just broke international law. The Legal Inspector evaluates the AI in the testing lab before it ever sees the public.</p>
+  <div class="tab-panel" id="panel-compliance">
+    <section class="stage" style="--accent:var(--amber)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">03</div>
+          <div>
+            <h2 class="stage-title">Compliance turns safety into release criteria.</h2>
+            <p class="stage-kicker">In the evaluation folder, compliance checks are framed around EU AI Act style prohibited-risk behavior and Indian DPDP style personal-data leakage. Students should understand these as product risk lenses, not just test names.</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card accent">
+            <h3>EU AI Act lens</h3>
+            <p>The grader looks for outputs that drift toward prohibited or high-risk behavior: manipulation, exploitation of vulnerable people, social scoring, unauthorized profiling, or workplace emotion recognition.</p>
+            <ul>
+              <li><span class="strong">Teaching idea:</span> AI safety includes what the system refuses to do.</li>
+              <li><span class="strong">Production habit:</span> Fail risky behavior before launch, not after a user reports harm.</li>
+            </ul>
+          </div>
+          <div class="card accent">
+            <h3>Indian DPDP lens</h3>
+            <p>The grader checks whether personal identifiers are exposed in plain text. Aadhaar, PAN, voter IDs, passport numbers, phone numbers, and emails should be masked or redacted when they do not belong in the answer.</p>
+            <ul>
+              <li><span class="strong">Teaching idea:</span> Privacy is not only storage; generated text can leak data too.</li>
+              <li><span class="strong">Production habit:</span> Use placeholders that preserve meaning while removing sensitive values.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card accent" style="margin-top:24px">
+          <h3>Compliance is defense in depth</h3>
+          <p>One prompt instruction is not enough. A robust system uses input policy, agent routing, output checks, evaluation tests, logs, and human escalation for sensitive cases. The evaluation layer is the audit gate that tells you whether the rest of the system behaved.</p>
+          <div class="pill-row">
+            <span class="pill">Policy</span><span class="pill">Redaction</span><span class="pill">Rubric</span><span class="pill">Audit trail</span><span class="pill">Human review</span>
+          </div>
+        </div>
       </div>
+    </section>
+  </div>
 
-      <h3>2. Indian DPDP Act (Data Protection)</h3>
-      <p>The Digital Personal Data Protection (DPDP) Act mandates that Personally Identifiable Information (PII) must not be processed or leaked without explicit consent.</p>
-      <ul>
-        <li><strong>What is PII?</strong> Aadhaar numbers (Indian National ID), PAN cards, raw phone numbers, and emails.</li>
-        <li><strong>Redaction vs. Masking:</strong> If an AI sees a phone number, you could just delete it (Redaction). But if you delete it, the AI might output weird, broken sentences like "Your ID is and your phone is ." Instead, we use <strong>Masking</strong>. We replace the number with a placeholder like <code>[REDACTED_AADHAAR]</code>. This keeps the sentence grammatically perfect, lets the AI know an ID was present, but completely protects the user's private data.</li>
-      </ul>
-
-      <div class="deep-dive">
-        <h4 style="color:var(--s7)">In Our Code (compliance.py)</h4>
-        <p>We built custom DeepEval G-Eval metrics that act as automated lawyers. They read the outputs specifically looking for EU AI Act violations and DPDP unmasked PII. If it finds a 12-digit number that isn't masked, the test fails, preventing the deployment of that code.</p>
+  <div class="tab-panel" id="panel-trace">
+    <section class="stage" style="--accent:var(--blue)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">04</div>
+          <div>
+            <h2 class="stage-title">Agent evaluation must inspect the journey.</h2>
+            <p class="stage-kicker">A final answer can hide operational problems. Your live test runs the real LangGraph pipeline, extracts the final state, and then evaluates the answer with the real context the agents gathered.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="flow-step"><div class="n">1</div><h4>Compile team</h4><p>The selected agents become the active graph for this question.</p></div>
+          <div class="flow-step"><div class="n">2</div><h4>Invoke graph</h4><p>The system runs real planning, search, writing, critique, and possible revision.</p></div>
+          <div class="flow-step"><div class="n">3</div><h4>Capture state</h4><p>Sources, facts, iterations, call count, and elapsed time become evaluation evidence.</p></div>
+          <div class="flow-step"><div class="n">4</div><h4>Build context</h4><p>Source snippets and extracted facts become the retrieval context for factual judging.</p></div>
+          <div class="flow-step"><div class="n">5</div><h4>Report gates</h4><p>Every metric returns a score, pass/fail status, and reason.</p></div>
+        </div>
+        <div class="grid-3">
+          <div class="card accent"><h3>Step efficiency</h3><p>Did the agent solve the task in a reasonable number of steps, or did the writer and critic loop wastefully?</p></div>
+          <div class="card accent"><h3>Task completion</h3><p>Did the answer satisfy every part of the prompt, especially multi-part requests?</p></div>
+          <div class="card accent"><h3>Cost awareness</h3><p>LLM calls, search calls, iterations, and duration are product signals, not trivia.</p></div>
+        </div>
       </div>
-    </div>
-  </section>
-</div>
+    </section>
+  </div>
 
-<!-- TAB 3: OPERATIONAL TRACE TESTING -->
-<div class="tab-panel" id="panel-operational">
-  <section class="stage">
-    <div class="container">
-      <h2 style="color: var(--s8)">Operational Trace Testing</h2>
-      <p>Testing a single string of text against another string is called "Static Testing". It's fine for simple apps, but AI agents are dynamic. They think, they loop, they use tools, and they change their minds. We must test them while they are moving.</p>
-
-      <h3>1. Live LangGraph Tracing</h3>
-      <p>Our AI system is built on LangGraph, meaning it has a "Planner", a "Searcher", a "Writer", and a "Critic". They pass notes to each other in a loop.</p>
-      <ul>
-        <li><strong>The Problem with Static Tests:</strong> A static test only looks at the final answer. It doesn't know if the AI spent $50 on API calls and searched the web 100 times just to answer "What is 2+2?".</li>
-        <li><strong>The Trace:</strong> A "Trace" is the complete history of everything the agent did. It records every tool call, every loop, and every millisecond spent thinking.</li>
-      </ul>
-
-      <div class="metaphor-box" style="border-left-color: var(--s8); background: rgba(250,204,21,0.05);">
-        <h4>🚗 The Crash Test Simulator</h4>
-        <p>You wouldn't test a car's airbag by taking it out of the car and hitting it with a hammer. You test it by putting it in a real car and driving into a wall. Our live tests put a real question into the active LangGraph engine, let the agents fight it out, and then grade the entire performance from start to finish.</p>
+  <div class="tab-panel" id="panel-summary">
+    <section class="stage" style="--accent:var(--green)">
+      <div class="container">
+        <div class="stage-header">
+          <div class="stage-num-big">05</div>
+          <div>
+            <h2 class="stage-title">Vocabulary and final recap.</h2>
+            <p class="stage-kicker">These are the words students should be able to use correctly after the lesson.</p>
+          </div>
+        </div>
+        <div class="vocab-grid">
+          <div class="term"><div class="word">Evaluation</div><p>Measuring whether an AI system meets a defined quality standard.</p></div>
+          <div class="term"><div class="word">Metric</div><p>A specific scoring rule for one behavior, such as faithfulness or compliance.</p></div>
+          <div class="term"><div class="word">DeepEval</div><p>An evaluation framework for organizing AI test cases, metrics, thresholds, and reports.</p></div>
+          <div class="term"><div class="word">Rubric</div><p>Plain-language grading criteria used by a judge model.</p></div>
+          <div class="term"><div class="word">G-Eval</div><p>A rubric-based evaluation technique for grading open-ended model outputs.</p></div>
+          <div class="term"><div class="word">LLM-as-Judge</div><p>A stronger model or configured model used to grade open-ended AI outputs.</p></div>
+          <div class="term"><div class="word">Hallucination</div><p>A generated claim not supported by the available evidence.</p></div>
+          <div class="term"><div class="word">Faithfulness</div><p>How closely the answer stays loyal to retrieved facts and source context.</p></div>
+          <div class="term"><div class="word">PII</div><p>Personally identifiable information such as national IDs, phone numbers, and emails.</p></div>
+          <div class="term"><div class="word">Threshold</div><p>The minimum acceptable score for a release gate.</p></div>
+          <div class="term"><div class="word">Trace</div><p>The full record of agent steps, tool use, loops, timing, and final state.</p></div>
+        </div>
+        <div class="summary-band" style="margin-top:32px">
+          <h3>Final summary</h3>
+          <ul>
+            <li>AI evaluation is not one test; it is a layered quality system.</li>
+            <li>Exact match is useful for deterministic values, but semantic tasks need rubric-based judgment.</li>
+            <li>Factual quality has two sides: avoid invented claims and stay faithful to retrieved evidence.</li>
+            <li>Compliance checks convert legal and privacy expectations into automated release gates.</li>
+            <li>Agent systems must be evaluated from their trace, because cost, loops, tool behavior, and completion matter in production.</li>
+          </ul>
+        </div>
       </div>
-
-      <h3>2. Measuring Efficiency & Completion</h3>
-      <p>When we test the live trace, we evaluate two operational metrics:</p>
-      <ul>
-        <li><strong>Step Efficiency:</strong> If the Writer writes a draft, and the Critic rejects it, they loop. If they loop 2 times, that's good peer-review. If they loop 15 times, the AI is broken, trapped in an infinite argument, burning expensive API credits. The test measures loop counts to ensure operational efficiency.</li>
-        <li><strong>Task Completion:</strong> Did the agent actually do all the work? If the user asks: <em>"Explain Python AND write a script"</em>, the agent might write a great explanation but forget the script. The evaluation scans the final answer against the multi-part prompt to ensure 100% completion.</li>
-      </ul>
-
-      <div class="deep-dive">
-        <h4 style="color:var(--s8)">In Our Code (test_agent_evaluation.py)</h4>
-        <p>Our code spins up the orchestrator, fires a real prompt through the graph, captures the exact state (the number of iterations, the number of sources found, the time elapsed), and feeds that live state into the DeepEval rubrics. It proves the system works in the real world.</p>
-      </div>
-    </div>
-  </section>
-</div>
+    </section>
+  </div>
+</main>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const buttons = document.querySelectorAll('.tab-btn');
   const panels = document.querySelectorAll('.tab-panel');
-
   buttons.forEach(button => {
     button.addEventListener('click', () => {
-      const targetTab = button.getAttribute('data-tab');
-
+      const tab = button.dataset.tab;
       buttons.forEach(btn => btn.classList.remove('active'));
       panels.forEach(panel => panel.classList.remove('active'));
-
       button.classList.add('active');
-      document.getElementById(`panel-${targetTab}`).classList.add('active');
-      
-      if(targetTab === 'factual') {
-        button.style.backgroundColor = 'rgba(236,72,153,0.2)';
-        button.style.borderColor = 'var(--s2)';
-      } else if (targetTab === 'regulatory') {
-        button.style.backgroundColor = 'rgba(249,115,22,0.2)';
-        button.style.borderColor = 'var(--s7)';
-      } else {
-        button.style.backgroundColor = 'rgba(250,204,21,0.2)';
-        button.style.borderColor = 'var(--s8)';
-      }
+      document.getElementById(`panel-${tab}`).classList.add('active');
+      window.scrollTo({top: document.querySelector('.tabs').offsetTop, behavior: 'smooth'});
     });
   });
 });
 </script>
-
 </body>
 </html>

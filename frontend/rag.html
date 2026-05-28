@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Upload a document and search it with hybrid RAG retrieval.">
+    <title>RAG Document Search</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+        --bg: #0a0e1a;
+        --bg2: #111827;
+        --card: #1a2035;
+        --border: #2a3555;
+        --text: #e2e8f0;
+        --dim: #94a3b8;
+        --muted: #64748b;
+        --accent: #6366f1;
+        --accent-glow: rgba(99,102,241,0.3);
+        --accent-soft: rgba(99,102,241,0.15);
+        --green: #22c55e;
+        --green-glow: rgba(34,197,94,0.25);
+        --teal: #14b8a6;
+        --amber: #f59e0b;
+        --radius: 12px;
+        --radius-sm: 8px;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        line-height: 1.6;
+    }
+
+    .app { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    /* Header */
+    .header { text-align: center; padding: 3rem 0 2rem; position: relative; }
+    .header-glow {
+        position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+        width: 400px; height: 200px;
+        background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .header h1 {
+        font-size: 2.2rem; font-weight: 700;
+        background: linear-gradient(135deg, #818cf8, #6366f1, #a78bfa);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .subtitle { color: var(--dim); font-size: 1rem; margin-top: 0.5rem; }
+
+    /* Upload zone */
+    .upload-zone {
+        border: 2px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 3rem 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: var(--bg2);
+        margin-bottom: 1.5rem;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: var(--accent);
+        background: rgba(99,102,241,0.05);
+    }
+    .upload-zone .icon { font-size: 3rem; margin-bottom: 0.75rem; }
+    .upload-zone .label { font-size: 1.1rem; color: var(--dim); }
+    .upload-zone .label strong { color: var(--accent); }
+    .upload-zone input { display: none; }
+
+    /* Status bar */
+    .status-bar {
+        display: none;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        animation: fadeIn 0.3s ease-out;
+    }
+    .status-bar.visible { display: flex; align-items: center; gap: 1rem; }
+    .status-bar .info { flex: 1; }
+    .status-bar .filename { font-weight: 600; font-size: 0.95rem; }
+    .status-bar .meta { font-size: 0.82rem; color: var(--muted); margin-top: 0.25rem; }
+    .pill {
+        display: inline-block;
+        background: var(--accent-soft);
+        color: #a5b4fc;
+        border: 1px solid rgba(99,102,241,0.25);
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.72rem;
+        font-weight: 500;
+        margin-right: 0.3rem;
+    }
+
+    /* Search bar */
+    .search-section { margin-bottom: 2rem; }
+    .search-wrapper {
+        display: flex; gap: 0.75rem;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.5rem;
+        transition: border-color 0.2s;
+    }
+    .search-wrapper:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    #search-input {
+        flex: 1; background: transparent; border: none; outline: none;
+        color: var(--text); font-size: 0.95rem; padding: 0.75rem; font-family: inherit;
+    }
+    #search-input::placeholder { color: var(--muted); }
+    #search-input:disabled { opacity: 0.4; }
+    .search-btn {
+        background: var(--accent); color: white; border: none;
+        border-radius: var(--radius-sm); padding: 0.75rem 1.5rem;
+        font-size: 0.9rem; font-weight: 600; cursor: pointer;
+        font-family: inherit; display: flex; align-items: center; gap: 0.5rem;
+        transition: all 0.2s; white-space: nowrap;
+    }
+    .search-btn:hover { background: #5558e6; transform: translateY(-1px); }
+    .search-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Spinner */
+    .spinner {
+        width: 16px; height: 16px;
+        border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+        border-radius: 50%; animation: spin 0.6s linear infinite;
+        display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Results */
+    .results-header {
+        display: none; justify-content: space-between; align-items: center;
+        margin-bottom: 1rem;
+    }
+    .results-header.visible { display: flex; }
+    .results-header h2 {
+        font-size: 0.85rem; font-weight: 600; text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--muted);
+    }
+    .results-header .elapsed { font-size: 0.8rem; color: var(--muted); }
+
+    .result-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 0.75rem;
+        animation: fadeIn 0.4s ease-out;
+        border-left: 3px solid var(--accent);
+    }
+    .result-top {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 0.75rem;
+    }
+    .result-title { font-weight: 600; font-size: 0.9rem; }
+    .score-badge {
+        background: var(--green-glow);
+        color: var(--green);
+        font-weight: 700; font-size: 0.82rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 6px;
+        border: 1px solid rgba(34,197,94,0.3);
+    }
+    .result-text {
+        font-size: 0.88rem; color: var(--dim); line-height: 1.65;
+        white-space: pre-wrap; max-height: 150px; overflow: hidden;
+        position: relative;
+        transition: max-height 0.3s;
+    }
+    .result-text.expanded { max-height: none; }
+    .result-text::after {
+        content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+        height: 40px;
+        background: linear-gradient(transparent, var(--card));
+        pointer-events: none;
+    }
+    .result-text.expanded::after { display: none; }
+    .expand-btn {
+        background: none; border: none; color: var(--accent);
+        font-size: 0.8rem; font-weight: 500; cursor: pointer;
+        padding: 0.5rem 0 0; font-family: inherit;
+    }
+    .result-pills { margin-top: 0.5rem; }
+
+    /* Error */
+    .error-card {
+        background: var(--card);
+        border: 1px solid rgba(239,68,68,0.3);
+        border-radius: var(--radius);
+        padding: 1.2rem 1.5rem;
+        color: #ef4444; font-size: 0.9rem;
+        display: none; margin-bottom: 1rem;
+        animation: fadeIn 0.3s ease-out;
+    }
+    .error-card.visible { display: block; }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 600px) {
+        .app { padding: 1rem; }
+        .header h1 { font-size: 1.6rem; }
+        .search-wrapper { flex-direction: column; }
+        .search-btn { width: 100%; justify-content: center; }
+    }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="header-glow"></div>
+            <h1>RAG Document Search</h1>
+            <p class="subtitle">Upload a file. Ask questions. Get retrieved chunks with citations.</p>
+        </header>
+
+        <!-- Upload -->
+        <div class="upload-zone" id="upload-zone">
+            <div class="icon">📄</div>
+            <div class="label">Drop a <strong>PDF</strong>, <strong>TXT</strong>, or <strong>MD</strong> file here — or click to browse</div>
+            <input type="file" id="file-input" accept=".pdf,.txt,.md">
+        </div>
+
+        <!-- Status -->
+        <div class="status-bar" id="status-bar">
+            <div class="info">
+                <div class="filename" id="status-filename"></div>
+                <div class="meta" id="status-meta"></div>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div class="error-card" id="error-card"></div>
+
+        <!-- Search -->
+        <section class="search-section">
+            <div class="search-wrapper">
+                <input type="text" id="search-input" placeholder="Ask a question about the uploaded document..." disabled>
+                <button class="search-btn" id="search-btn" disabled>
+                    <span class="btn-text">Search</span>
+                    <span class="spinner" id="search-spinner"></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Results -->
+        <div class="results-header" id="results-header">
+            <h2>Retrieved Chunks</h2>
+            <span class="elapsed" id="elapsed"></span>
+        </div>
+        <div id="results-container"></div>
+    </div>
+
+    <script src="/static/rag.js"></script>
+</body>
+</html>

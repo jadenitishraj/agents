@@ -23,3 +23,6 @@ opentelemetry-distro>=0.47b0
 opentelemetry-exporter-prometheus-remote-write>=0.62b1
 opentelemetry-instrumentation-fastapi>=0.47b0
 deepeval>=4.0.0
+# For production: swap LLMRerank with a local BERT cross-encoder:
+# sentence-transformers>=3.0.0
+python-multipart>=0.0.9
