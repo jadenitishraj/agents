@@ -25,17 +25,23 @@ TAXONOMY: dict[str, dict] = {
         "phase": "pipeline",
         "order": 2,
     },
+    "InternalSearcher": {
+        "mission": "Search the internal global RAG database.",
+        "always": True,
+        "phase": "pipeline",
+        "order": 3,
+    },
     "Reader": {
         "mission": "Read source snippets and extract structured facts.",
         "always": False,
         "phase": "pipeline",
-        "order": 3,
+        "order": 4,
     },
     "Compliance": {
         "mission": "Add guardrails for sensitive domains.",
         "always": False,
         "phase": "pipeline",
-        "order": 4,
+        "order": 5,
     },
     "Writer": {
         "mission": "Synthesize findings into a clear answer.",

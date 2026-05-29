@@ -1,0 +1,26 @@
+[
+  {
+    "id": "a243aa44-b660-4bb9-a138-25991cf6a0e9",
+    "text": "Python is a high-level, interpreted programming language. It was created by Guido van Rossum and first released in 1991. Python's design philosophy emphasizes code readability with its notable use of significant indentation. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects.",
+    "metadata": {
+      "source_file": "test_document.txt",
+      "extension": ".txt"
+    }
+  },
+  {
+    "id": "5e8fdfad-9522-4c1d-9787-544d72d4a10e",
+    "text": "Python is a high-level, interpreted programming language. It was created by Guido van Rossum and first released in 1991. Python's design philosophy emphasizes code readability with its notable use of significant indentation. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects.",
+    "metadata": {
+      "source_file": "test_document.txt",
+      "extension": ".txt"
+    }
+  },
+  {
+    "id": "957d03a9-dea7-41a4-b35e-254e9d66d6d9",
+    "text": "Python is a high-level, interpreted programming language. It was created by Guido van Rossum and first released in 1991. Python's design philosophy emphasizes code readability with its notable use of significant indentation. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects.",
+    "metadata": {
+      "source_file": "test_document.txt",
+      "extension": ".txt"
+    }
+  }
+]

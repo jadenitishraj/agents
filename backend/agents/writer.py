@@ -17,6 +17,7 @@ def writer_agent(
     question: str,
     sources: list[Source],
     facts: list[str],
+    internal_facts: list[str] = None,
     disclaimer: str = "",
     critic_feedback: str = "",
 ) -> str:
@@ -25,7 +26,10 @@ def writer_agent(
     sources_text = "\n".join(
         f"- {s['title']} ({s['url']})" for s in sources[:8]
     )
-    facts_text = "\n".join(f"- {f}" for f in facts) if facts else "(none)"
+    all_facts = list(facts)
+    if internal_facts:
+        all_facts.extend([f"[Internal DB] {f}" for f in internal_facts])
+    facts_text = "\n".join(f"- {f}" for f in all_facts) if all_facts else "(none)"
     feedback_text = ""
     if critic_feedback:
         feedback_text = (

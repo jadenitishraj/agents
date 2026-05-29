@@ -46,6 +46,8 @@ class State(TypedDict, total=False):
     queries: list[str]
     sources: list[Source]
     facts: list[str]
+    internal_facts: list[str]
+    internal_contexts: list[str]
     rag_contexts: list[str]
     rag_citations: list[Source]
     rag_parser_summary: dict[str, int]
@@ -107,6 +109,19 @@ def searcher_node(state: State) -> dict:
     }
 
 
+from backend.agents.internal_search import internal_search_agent
+
+def internal_search_node(state: State) -> dict:
+    """Run the Internal Search agent to extract facts from the global DB."""
+    print("  InternalSearcher -> searching global database...")
+    result = internal_search_agent(state["question"])
+    print(f"    {len(result.get('facts', []))} facts extracted from {len(result.get('contexts', []))} contexts")
+    return {
+        "internal_facts": result.get("facts", []),
+        "internal_contexts": result.get("contexts", []),
+        "llm_calls": state.get("llm_calls", 0) + 1,
+    }
+
 def reader_node(state: State) -> dict:
     """Run the Reader agent to extract facts."""
     print("  Reader -> extracting facts...")
@@ -153,8 +168,9 @@ def writer_node(state: State) -> dict:
         state["question"],
         state.get("sources", []),
         state.get("facts", []),
-        state.get("disclaimer", ""),
-        feedback,
+        internal_facts=state.get("internal_facts", []),
+        disclaimer=state.get("disclaimer", ""),
+        critic_feedback=feedback,
     )
     iteration = state.get("iterations", 0) + 1
     print(f"    Draft ready ({len(answer.split())} words) — iteration {iteration}")
@@ -226,6 +242,7 @@ def human_review_node(state: State) -> dict:
 NODE_REGISTRY: dict[str, callable] = {
     "Planner": planner_node,
     "Searcher": searcher_node,
+    "InternalSearcher": internal_search_node,
     "Reader": reader_node,
     "Compliance": compliance_node,
     "Writer": writer_node,
