@@ -81,11 +81,6 @@ def build_guard(banned_words, min_len=1, max_len=2000):
                 ),
                 BanList(banned_words=banned_words, on_fail=OnFailAction.EXCEPTION),
                 SecretsPresent(on_fail=OnFailAction.EXCEPTION),
-                RegexMatch(
-                    regex=CARD_RE.pattern,
-                    match_type="search",
-                    on_fail=OnFailAction.EXCEPTION,
-                ),
             ]
         )
 
@@ -98,6 +93,16 @@ def build_guard(banned_words, min_len=1, max_len=2000):
 
 def is_safe(guard, text) -> tuple[bool, str]:
     try:
+        # 1. Unconditional explicit regex checks
+        if EMAIL_RE.search(text): return False, "Detected email address"
+        if PHONE_RE.search(text): return False, "Detected phone number"
+        if SSN_RE.search(text): return False, "Detected US SSN"
+        if AWS_KEY_RE.search(text): return False, "Detected AWS access key"
+        if GITHUB_TOKEN_RE.search(text): return False, "Detected GitHub token"
+        if OPENAI_KEY_RE.search(text): return False, "Detected OpenAI API key"
+        if CARD_RE.search(text): return False, "Detected payment card number"
+
+        # 2. Guardrails execution (length, banned words, etc)
         outcome = guard.validate(text)
         if outcome.validation_passed:
             return True, "OK"

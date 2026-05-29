@@ -19,8 +19,26 @@
             <p class="subtitle">Ask a question. Agents collaborate. Get answers.</p>
         </header>
 
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('research')">Web & RAG Research</button>
+            <button class="tab-btn" onclick="switchTab('upload')">Upload to Knowledge Base</button>
+        </div>
+
+        <!-- Upload Section -->
+        <section class="upload-section" id="upload-tab" style="display:none;">
+            <div class="input-wrapper">
+                <input type="file" id="file-input" accept=".txt,.pdf,.md">
+                <button id="upload-btn" onclick="uploadFile()">
+                    <span class="btn-text">Upload to RAG</span>
+                    <span class="btn-loader upload-loader" style="display:none;"></span>
+                </button>
+            </div>
+            <p id="upload-status" class="status-msg"></p>
+        </section>
+
         <!-- Input Section -->
-        <section class="input-section">
+        <section class="input-section" id="research-tab">
             <div class="input-wrapper">
                 <input
                     type="text"
@@ -50,7 +68,10 @@
 
         <!-- Final Answer -->
         <section class="answer-section" id="answer-section" style="display:none;">
-            <h2>Final Answer</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 style="margin-bottom: 0;">Final Answer</h2>
+                <button id="view-chunks-btn" onclick="openChunksModal()" style="display:none; background:var(--accent-soft); color:#a5b4fc; border:1px solid var(--accent); padding:0.4rem 0.8rem; border-radius:var(--radius-sm); cursor:pointer; font-size:0.8rem; font-weight:600;">View Retrieved Chunks</button>
+            </div>
             <div class="answer-card" id="final-answer"></div>
             <div class="rag-metrics" id="rag-metrics" style="display:none;"></div>
             <div class="run-summary" id="run-summary"></div>
@@ -58,6 +79,15 @@
                 <span class="helicone-icon">⬡</span> View in Helicone
             </a>
         </section>
+    </div>
+
+    <!-- Context Modal -->
+    <div id="chunks-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeChunksModal()">&times;</span>
+            <h2>Retrieved Chunks</h2>
+            <div id="chunks-container"></div>
+        </div>
     </div>
 
     <script src="/static/index.js"></script>

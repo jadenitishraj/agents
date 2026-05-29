@@ -8,14 +8,22 @@ def parse_file(file_path: str) -> dict:
         raise FileNotFoundError(f"File {file_path} not found.")
     
     print(f"  → Parsing file: {path.name}...")
+    ext = path.suffix.lower()
     
-    # Read text (assuming utf-8 for now, robust implementations would handle PDF, etc.)
-    # In a real app we'd use LlamaIndex FlatReader, but for simplicity we just read text here
-    # or handle it dynamically. Let's just read as text.
-    text = path.read_text(encoding="utf-8", errors="replace")
+    if ext == ".pdf":
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(str(path))
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n\n"
+        except Exception as e:
+            print(f"  → Error parsing PDF: {e}")
+            text = f"Error parsing PDF: {e}"
+    else:
+        text = path.read_text(encoding="utf-8", errors="replace")
     
     # Simple classification heuristic based on extension
-    ext = path.suffix.lower()
     strategy = "sentence" # Default strategy
     
     if ext == ".md":

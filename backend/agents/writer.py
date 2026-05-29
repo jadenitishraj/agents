@@ -18,6 +18,7 @@ def writer_agent(
     sources: list[Source],
     facts: list[str],
     internal_facts: list[str] = None,
+    internal_contexts: list[str] = None,
     disclaimer: str = "",
     critic_feedback: str = "",
 ) -> str:
@@ -41,10 +42,14 @@ def writer_agent(
         f"Include this disclaimer at the end: {disclaimer}" if disclaimer else ""
     )
 
+    chunks_text = ""
+    if internal_contexts and len(internal_contexts) > 0:
+        chunks_text = "\n\nRAG Contexts:\n" + "\n\n".join(f"[Chunk {i+1}] {c}" for i, c in enumerate(internal_contexts))
+
     prompt = f"""{policy}
 
 Write a clear, well-structured answer (150-300 words) to the question.
-Use the facts and cite sources where appropriate.
+Use the facts, contexts, and cite sources where appropriate.
 {disclaimer_line}
 
 Question: {wrap_user_input(question)}
@@ -53,7 +58,7 @@ Facts:
 {facts_text}
 
 Sources:
-{wrap_user_input(sources_text)}{feedback_text}"""
+{wrap_user_input(sources_text)}{chunks_text}{feedback_text}"""
     return call_llm(prompt, max_tokens=600, agent_name="Writer")
     # Teaching note:
     # This project builds the writer prompt as one explicit string so students can

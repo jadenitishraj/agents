@@ -10,6 +10,71 @@
 
 const API_BASE = "";  // Same origin — served by FastAPI.
 
+// ─── Tabs ───────────────────────────────────────────────────
+
+function switchTab(tab) {
+    document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+    event.target.classList.add("active");
+
+    if (tab === "research") {
+        document.getElementById("research-tab").style.display = "block";
+        document.getElementById("upload-tab").style.display = "none";
+    } else {
+        document.getElementById("research-tab").style.display = "none";
+        document.getElementById("upload-tab").style.display = "block";
+    }
+}
+
+// ─── Upload ─────────────────────────────────────────────────
+
+async function uploadFile() {
+    const fileInput = document.getElementById("file-input");
+    const statusEl = document.getElementById("upload-status");
+    const btn = document.getElementById("upload-btn");
+    const text = btn.querySelector(".btn-text");
+    const loader = btn.querySelector(".btn-loader");
+    
+    if (!fileInput.files.length) {
+        statusEl.textContent = "Please select a file first.";
+        statusEl.style.color = "#ff6b6b";
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+
+    btn.disabled = true;
+    text.textContent = "Uploading...";
+    loader.style.display = "inline-block";
+    statusEl.textContent = "";
+
+    try {
+        const res = await fetch(`${API_BASE}/rag/upload`, {
+            method: "POST",
+            body: formData,
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+            throw new Error(data.error || "Upload failed");
+        }
+        
+        statusEl.textContent = `Success! Indexed ${data.chunks} chunks from ${data.filename}.`;
+        statusEl.style.color = "#4ade80";
+        fileInput.value = ""; // Clear input
+        
+    } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.style.color = "#ff6b6b";
+    } finally {
+        btn.disabled = false;
+        text.textContent = "Upload to RAG";
+        loader.style.display = "none";
+    }
+}
+
 // ─── Submit ─────────────────────────────────────────────────
 
 async function submitQuestion() {
@@ -89,6 +154,7 @@ function showAnswer(data) {
     const answer = document.getElementById("final-answer");
     const metrics = document.getElementById("rag-metrics");
     const summary = document.getElementById("run-summary");
+    const chunksBtn = document.getElementById("view-chunks-btn");
 
     answer.textContent = data.final_answer;
     showMetrics(metrics, data.rag_metrics || {}, data.rag_parser_summary || {});
@@ -96,8 +162,45 @@ function showAnswer(data) {
         `${data.iterations} iteration(s) · ${data.llm_calls} LLM calls · ` +
         `${data.sources_count} sources · ${data.duration_seconds.toFixed(1)}s`;
 
+    // Save contexts for modal
+    window.currentChunks = data.retrieved_contexts || [];
+    if (window.currentChunks.length > 0) {
+        chunksBtn.style.display = "inline-block";
+    } else {
+        chunksBtn.style.display = "none";
+    }
+
     section.style.display = "block";
     section.scrollIntoView({ behavior: "smooth" });
+}
+
+// ─── Modal ──────────────────────────────────────────────────
+
+function openChunksModal() {
+    const container = document.getElementById("chunks-container");
+    const chunks = window.currentChunks || [];
+    
+    if (chunks.length === 0) {
+        container.innerHTML = "<p>No chunks retrieved for this question.</p>";
+    } else {
+        container.innerHTML = chunks.map(chunk => 
+            `<div class="chunk-card">${escapeHtml(chunk)}</div>`
+        ).join("");
+    }
+    
+    document.getElementById("chunks-modal").style.display = "flex";
+}
+
+function closeChunksModal() {
+    document.getElementById("chunks-modal").style.display = "none";
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+    const modal = document.getElementById("chunks-modal");
+    if (event.target === modal) {
+        closeChunksModal();
+    }
 }
 
 function showError(message) {

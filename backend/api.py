@@ -143,6 +143,7 @@ async def research(req: ResearchRequest):
         "sources_count": final_state.get("sources_count", 0),
         "duration_seconds": final_state.get("duration_seconds", 0),
         "was_sensitive": final_state.get("was_sensitive", False),
+        "retrieved_contexts": final_state.get("rag_contexts", []) + final_state.get("internal_contexts", []),
         "rag_metrics": final_state.get("rag_metrics", {}),
         "rag_parser_summary": final_state.get("rag_parser_summary", {}),
         "guardrails": {
@@ -167,9 +168,11 @@ class RagSearchRequest(BaseModel):
     top_k: int = 5
 
 
+from backend.rag_v2.pipeline import ingest_file
+
 @app.post("/rag/upload")
 async def rag_upload(file: UploadFile = File(...)):
-    """Upload a document, index it, return corpus_id."""
+    """Upload a document and permanently index it into the global DB."""
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in ALLOWED_SUFFIXES:
         return JSONResponse(
@@ -185,31 +188,19 @@ async def rag_upload(file: UploadFile = File(...)):
 
     logger.info(f"RAG upload: saved {file.filename} ({len(content)} bytes)")
 
-    # Build corpus using the existing pipeline
-    configure_settings()
-    source: Source = {
-        "title": file.filename or "Uploaded Document",
-        "url": str(save_path),
-        "snippet": content[:300].decode("utf-8", errors="replace"),
-    }
-
     try:
-        corpus = build_corpus("uploaded document", [source])
+        # Use the new global ingest pipeline
+        result = ingest_file(str(save_path))
     except Exception as e:
-        logger.error(f"RAG indexing failed: {e}", exc_info=True)
+        logger.error(f"RAG global indexing failed: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-    corpus_id = str(uuid.uuid4())[:8]
-    rag_registry.register(corpus_id, corpus)
-
-    logger.info(f"RAG indexed: corpus_id={corpus_id}, chunks={len(corpus.nodes)}")
+    logger.info(f"RAG indexed: file={file.filename}, chunks={result.get('chunks_created')}")
 
     return {
-        "corpus_id": corpus_id,
+        "status": "success",
         "filename": file.filename,
-        "chunks": len(corpus.nodes),
-        "categories": list({c.category for c in corpus.classified}),
-        "strategies": list({c.chunk_strategy for c in corpus.classified}),
+        "chunks": result.get("chunks_created", 0),
     }
 
 

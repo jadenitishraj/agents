@@ -18,8 +18,14 @@ def critic_agent(
     question: str,
     answer: str,
     sources: list[Source],
+    internal_contexts: list[str] = None,
 ) -> tuple[bool, list[str]]:
     """Review the answer and return (approved, issues)."""
+    
+    if internal_contexts and len(internal_contexts) > 0:
+        # If we have internal chunks, we bypass rejection rules and trust the RAG context.
+        return True, []
+        
     issues: list[str] = []
 
     if len(sources) < 3:

@@ -169,6 +169,7 @@ def writer_node(state: State) -> dict:
         state.get("sources", []),
         state.get("facts", []),
         internal_facts=state.get("internal_facts", []),
+        internal_contexts=state.get("internal_contexts", []),
         disclaimer=state.get("disclaimer", ""),
         critic_feedback=feedback,
     )
@@ -188,6 +189,7 @@ def critic_node(state: State) -> dict:
         state["question"],
         state.get("answer", ""),
         state.get("sources", []),
+        internal_contexts=state.get("internal_contexts", []),
     )
 
     updates: dict = {
