@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from backend.rag.classifier import classify_sources
+from backend.rag.parser import classify_sources
 
 
 class ClassifierTests(unittest.TestCase):

@@ -31,20 +31,13 @@ body{
   color:var(--ink);
   line-height:1.6;
   overflow-x:hidden;
-  background-image:
-    radial-gradient(ellipse at top left,rgba(16,185,129,.16),transparent 42%),
-    radial-gradient(ellipse at bottom right,rgba(99,102,241,.12),transparent 46%);
-  background-attachment:fixed;
+  background-color: #0b0c10;
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(16, 185, 129, 0.08), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.08), transparent 25%);
+  background-attachment: fixed;
 }
-body:before{
-  content:"";
-  position:fixed;
-  inset:0;
-  pointer-events:none;
-  z-index:1;
-  opacity:.33;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-}
+/* Removed the noisy blurred SVG overlay to keep it crisp */
 .container{max-width:1280px;margin:0 auto;padding:0 32px;position:relative;z-index:2}
 .display{font-family:'Fraunces',serif;font-weight:900;letter-spacing:-.04em;line-height:.95}
 .label{
@@ -220,7 +213,7 @@ body:before{
 .route p{font-size:15px;color:var(--ink-dim)}
 .storage-map{
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:repeat(3, 1fr);
   gap:24px;
   align-items:stretch;
 }
@@ -233,6 +226,7 @@ body:before{
 .store-box h3{font-family:'Fraunces',serif;font-size:31px;margin-bottom:12px}
 .store-box.vector{border-color:color-mix(in srgb,var(--emerald) 36%,var(--card-border))}
 .store-box.graph{border-color:color-mix(in srgb,var(--indigo) 36%,var(--card-border))}
+.store-box.bm25{border-color:color-mix(in srgb,var(--amber) 36%,var(--card-border))}
 .dots{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin:20px 0}
 .dot{aspect-ratio:1;border-radius:3px;background:linear-gradient(135deg,var(--emerald),var(--sky));opacity:.75}
 .nodes{position:relative;min-height:190px;margin:20px 0}
@@ -258,6 +252,14 @@ body:before{
 }
 .term .word{font:800 13px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
 .term p{font-size:15px;color:var(--ink-dim)}
+.code-container { margin-top: 24px; background: #0d0d12; border: 1px solid var(--card-border); border-radius: 6px; overflow: hidden; }
+.code-header { padding: 8px 16px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--card-border); font: 600 12px 'JetBrains Mono', monospace; color: var(--ink-dim); }
+pre { padding: 16px; margin: 0; overflow-x: auto; font: 400 13px/1.6 'JetBrains Mono', monospace; color: #e2e8f0; }
+.kw { color: #f472b6; }
+.fn { color: #38bdf8; }
+.st { color: #a3e635; }
+.cm { color: #64748b; font-style: italic; }
+.cl { color: #fbbf24; }
 .compare{width:100%;border-collapse:separate;border-spacing:0;margin-top:16px}
 .compare th{
   font:700 11px 'JetBrains Mono',monospace;
@@ -307,7 +309,7 @@ body:before{
     <div class="tabs-inner">
       <button class="tab-btn active" data-tab="map">System Map</button>
       <button class="tab-btn" data-tab="chunking">Classification + Chunking</button>
-      <button class="tab-btn" data-tab="storage">Vector + Graph</button>
+      <button class="tab-btn" data-tab="storage">Vector, Graph, BM25</button>
       <button class="tab-btn" data-tab="retrieval">Retrieval + Rerank</button>
       <button class="tab-btn" data-tab="summary">Vocab + Summary</button>
     </div>
@@ -341,8 +343,27 @@ body:before{
           </div>
           <div class="card accent">
             <h3>What students should notice</h3>
-            <p>The RAG design is modular. Each file owns one responsibility: classification, parsing, storage, indexing, query transformation, retrieval, citation, and evaluation.</p>
+            <p>The RAG design is modular. Each file owns exactly one responsibility: parser.py, chunker.py, indexer.py, pipeline.py, retriever.py, and evaluator.py.</p>
           </div>
+        </div>
+        <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> The orchestration layer is purely about coordinating the specialized files. Notice how it seamlessly runs parsing, chunking, and index creation before caching the entire corpus in memory so it can be queried multiple times without rebuilding.</p>
+        <div class="code-container" style="margin-top:12px">
+          <div class="code-header">backend/rag/pipeline.py (The Orchestrator)</div>
+          <pre><code><span class="kw">def</span> <span class="fn">build_corpus</span>(question: <span class="cl">str</span>, sources: <span class="cl">list</span>[Source]) -> <span class="cl">IndexedCorpus</span>:
+    <span class="cm">"""Run the full pipeline: load local files, classify, chunk, index."""</span>
+    <span class="fn">print</span>(<span class="st">"\n=== Starting RAG Pipeline Build Phase ==="</span>)
+    
+    <span class="cm"># Step 1: Parse & Classify sources (Markdown, PDF, Transcripts, etc.)</span>
+    classified = <span class="fn">classify_sources</span>(all_sources)
+    
+    <span class="cm"># Step 2: Split documents using their assigned strategy (Semantic, Hierarchical, etc.)</span>
+    documents, nodes = <span class="fn">chunk_sources</span>(classified)
+    
+    <span class="cm"># Step 3: Embed text and build the 3 indexes (Vector, BM25, Graph)</span>
+    storage, vector, graph, processed = <span class="fn">build_indexes</span>(question, all_sources, documents, nodes)
+    
+    <span class="fn">print</span>(<span class="st">"Build complete! Corpus stored in memory."</span>)
+    <span class="kw">return</span> <span class="cl">IndexedCorpus</span>(question, all_sources, classified, documents, processed, storage, vector, graph)</code></pre>
         </div>
       </div>
     </section>
@@ -381,6 +402,27 @@ body:before{
             <tr><td>Token splitting</td><td>Logs, traces, and compact technical text.</td><td>Overrunning the model context budget.</td></tr>
           </tbody>
         </table>
+        <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> Notice how the chunker avoids hardcoding a single splitting rule. By reading the classification tag from the parser, it dynamically selects between Semantic chunking (for transcripts), Hierarchical chunking (for long reports), or basic fallback strategies.</p>
+        <div class="code-container" style="margin-top:12px">
+          <div class="code-header">backend/rag/chunker.py (Dynamic Splitting Strategies)</div>
+          <pre><code><span class="kw">def</span> <span class="fn">_build_splitter</span>(strategy: <span class="cl">str</span>):
+    <span class="cm">"""Return the right LlamaIndex node parser for the given strategy."""</span>
+    <span class="kw">if</span> strategy == <span class="st">"markdown"</span>:
+        <span class="kw">return</span> <span class="cl">MarkdownNodeParser</span>()
+    <span class="kw">if</span> strategy == <span class="st">"html"</span>:
+        <span class="kw">return</span> <span class="cl">HTMLNodeParser</span>()
+    <span class="kw">if</span> strategy == <span class="st">"semantic"</span>:
+        <span class="cm"># Semantic chunking: only splits when embedding similarity drops below 90th percentile</span>
+        <span class="kw">return</span> <span class="cl">SemanticSplitterNodeParser</span>(breakpoint_percentile_threshold=<span class="st">90</span>)
+    <span class="kw">if</span> strategy == <span class="st">"hierarchical"</span>:
+        <span class="cm"># Multi-level chunks: coarse (1536) → medium (768) → fine (256)</span>
+        <span class="kw">return</span> <span class="cl">HierarchicalNodeParser</span>.from_defaults(chunk_sizes=[<span class="st">1536</span>, <span class="st">768</span>, <span class="st">256</span>])
+    <span class="kw">if</span> strategy == <span class="st">"token"</span>:
+        <span class="cm"># Fixed-size windows for logs</span>
+        <span class="kw">return</span> <span class="cl">TokenTextSplitter</span>(chunk_size=<span class="st">512</span>, chunk_overlap=<span class="st">50</span>)
+    <span class="cm"># Default fallback</span>
+    <span class="kw">return</span> <span class="cl">SentenceSplitter</span>(chunk_size=<span class="st">768</span>, chunk_overlap=<span class="st">80</span>)</code></pre>
+        </div>
       </div>
     </section>
   </div>
@@ -391,8 +433,8 @@ body:before{
         <div class="stage-header">
           <div class="stage-num-big">03</div>
           <div>
-            <h2 class="stage-title">Hybrid storage captures meaning and relationships.</h2>
-            <p class="stage-kicker">The project stores chunks in Chroma for vector search and uses a graph backend for relationship search, falling back gracefully when Neo4j credentials are not available.</p>
+            <h2 class="stage-title">Tri-index storage captures meaning, relationships, and keywords.</h2>
+            <p class="stage-kicker">The project stores chunks in Chroma for vector search, uses a graph backend for relationship search, and builds a BM25 index for exact keyword matching (with a fallback graph store if Neo4j is offline).</p>
           </div>
         </div>
         <div class="storage-map">
@@ -421,10 +463,40 @@ body:before{
             </div>
             <div class="pill-row"><span class="pill">nodes</span><span class="pill">edges</span><span class="pill">multi-hop</span></div>
           </div>
+          <div class="store-box bm25">
+            <h3>BM25 Keyword Index</h3>
+            <p>While Vectors look at meaning, BM25 looks at exact keyword matches using TF-IDF. It acts as a safety net: if a user searches for an exact product ID like "ERR-409", the vector model might misunderstand the meaning, but BM25 will find the exact string immediately.</p>
+            <div class="pill-row"><span class="pill">keyword match</span><span class="pill">tf-idf</span><span class="pill">exact terms</span></div>
+          </div>
         </div>
         <div class="card accent" style="margin-top:24px">
           <h3>Production robustness</h3>
           <p>The storage layer is built to degrade gracefully. If the graph database is configured, the system uses it. If not, it falls back to a simple local graph store so the learning demo still works.</p>
+        </div>
+        <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> The indexer iterates over the chunks just once, but maps them into three distinct mathematical representations: a Vector Index for meaning, a Knowledge Graph for connections, and a BM25 store (handled dynamically) for exact string matching. Notice how BM25 isn't saved to a database—it's built in-memory on the fly during retrieval using the `processed_nodes` returned here.</p>
+        <div class="code-container" style="margin-top:12px">
+          <div class="code-header">backend/rag/indexer.py (Tri-Index Creation)</div>
+          <pre><code><span class="kw">def</span> <span class="fn">build_indexes</span>(question, sources, documents, nodes):
+    <span class="fn">print</span>(<span class="st">"Building 3 indexes (Vector, BM25 context, Graph) from chunks..."</span>)
+    storage = <span class="fn">_build_storage</span>(question, sources)
+
+    <span class="cm"># 1. Pipeline embeds the chunks via OpenAI models</span>
+    <span class="fn">print</span>(<span class="st">"  → Generating embeddings for Vector index..."</span>)
+    pipeline = <span class="cl">IngestionPipeline</span>(transformations=[<span class="fn">get_llama_embed_model</span>()])
+    processed_nodes = <span class="cl">list</span>(pipeline.run(nodes=nodes))
+
+    <span class="cm"># 2. Vector Index stores embeddings in ChromaDB</span>
+    vector_index = <span class="cl">VectorStoreIndex</span>(processed_nodes, storage_context=storage)
+
+    <span class="cm"># 3. Knowledge Graph Index extracts entity triplets into Neo4j (or local graph)</span>
+    <span class="fn">print</span>(<span class="st">"  → Extracting entity triplets for Knowledge Graph index..."</span>)
+    graph_index = <span class="cl">KnowledgeGraphIndex</span>.from_documents(
+        documents, storage_context=storage, max_triplets_per_chunk=<span class="st">2</span>
+    )
+
+    <span class="cm"># Note: BM25 doesn't need to be saved to a database here. </span>
+    <span class="cm"># It is built dynamically in-memory from 'processed_nodes' during the Retrieval step!</span>
+    <span class="kw">return</span> storage, vector_index, graph_index, processed_nodes</code></pre>
         </div>
       </div>
     </section>
@@ -454,6 +526,29 @@ body:before{
           <div class="card accent"><h3>Vector search</h3><p>Great for meaning, paraphrases, concept matching, and questions that use different wording from the source.</p></div>
           <div class="card accent"><h3>LLM rerank</h3><p>Great for final selection because it compares the question against candidate chunks directly.</p></div>
         </div>
+        <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> The retriever is the heaviest lifter. It first expands the query using HyDE, then hits the Vector and BM25 indexes simultaneously. It merges those candidates using Reciprocal Rank Fusion, adds Graph hits, and finally runs a cross-encoder LLM to pick only the top 3 best chunks.</p>
+        <div class="code-container" style="margin-top:12px">
+          <div class="code-header">backend/rag/retriever.py (Hybrid Fusion & Rerank)</div>
+          <pre><code><span class="kw">def</span> <span class="fn">retrieve_context</span>(corpus: <span class="cl">IndexedCorpus</span>, question: <span class="cl">str</span>):
+    <span class="cm"># 1. Generate hypothetical answer (HyDE)</span>
+    <span class="fn">print</span>(<span class="st">"  → Generating HyDE query expansion..."</span>)
+    query_bundle = <span class="fn">_build_query_bundle</span>(question)
+
+    <span class="cm"># 2. Setup keyword (BM25) and semantic (Vector) search</span>
+    <span class="fn">print</span>(<span class="st">"  → Searching Vector and BM25 indexes..."</span>)
+    vector = corpus.vector_index.as_retriever(similarity_top_k=<span class="st">10</span>)
+    bm25 = <span class="cl">BM25Retriever</span>.from_defaults(nodes=corpus.nodes, similarity_top_k=<span class="st">10</span>)
+
+    <span class="cm"># 3. Fuse Vector + BM25 using Reciprocal Rank Fusion</span>
+    <span class="fn">print</span>(<span class="st">"  → Searching Knowledge Graph & fusing results..."</span>)
+    fusion = <span class="cl">QueryFusionRetriever</span>([vector, bm25], mode=<span class="st">"reciprocal_rerank"</span>)
+    candidates = <span class="cl">list</span>(fusion.retrieve(query_bundle)) + <span class="fn">_graph_hits</span>(corpus, question)
+
+    <span class="cm"># 4. LLM Reranking of final candidates</span>
+    <span class="fn">print</span>(<span class="st">"  → LLM reranking top candidates to find the best chunks..."</span>)
+    reranker = <span class="cl">LLMRerank</span>(llm=<span class="fn">get_llama_llm</span>(), choice_batch_size=<span class="st">5</span>, top_n=<span class="st">3</span>)
+    <span class="kw">return</span> <span class="fn">_contexts_and_citations</span>(reranker.postprocess_nodes(candidates, query_bundle))</code></pre>
+        </div>
         <div class="card accent" style="margin-top:24px">
           <h3>Citations complete the trust loop</h3>
           <p>Retrieval is not only about feeding the model. It also gives users and evaluators a way to inspect where the answer came from. Citations make the answer auditable.</p>
@@ -461,6 +556,23 @@ body:before{
         <div class="card accent" style="margin-top:24px">
           <h3>Ragas-style evaluation</h3>
           <p>After retrieval and answer generation, the system can score whether the answer is faithful to the retrieved context, whether the context was relevant, and whether the answer is supported by evidence. This turns RAG quality into a measurable report instead of a feeling.</p>
+        </div>
+        <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> The evaluator uses Ragas to act as an impartial judge. It spins up 4 independent LLM evaluations to test the answer against the retrieved context. If Faithfulness drops, the LLM hallucinated. If Context Precision drops, the retriever surfaced bad chunks.</p>
+        <div class="code-container" style="margin-top:12px">
+          <div class="code-header">backend/rag/evaluator.py (Ragas Metrics)</div>
+          <pre><code><span class="kw">async def</span> <span class="fn">_score_async</span>(question, answer, contexts, reference):
+    <span class="fn">print</span>(<span class="st">"\n=== Starting Ragas Evaluation ==="</span>)
+    <span class="fn">print</span>(<span class="st">"  → Running LLM judges for Faithfulness, Relevance, Precision, and Recall..."</span>)
+    sample = <span class="cl">SingleTurnSample</span>(user_input=question, response=answer, retrieved_contexts=contexts, reference=reference)
+    
+    <span class="cm"># LLM-as-a-Judge computes these 4 independent scores</span>
+    metrics = {
+        <span class="st">"faithfulness"</span>: <span class="cl">Faithfulness</span>(llm=llm),
+        <span class="st">"answer_relevance"</span>: <span class="cl">ResponseRelevancy</span>(llm=llm, embeddings=embeds),
+        <span class="st">"context_precision"</span>: <span class="cl">LLMContextPrecisionWithoutReference</span>(llm=llm),
+        <span class="st">"context_recall"</span>: <span class="cl">LLMContextRecall</span>(llm=llm),
+    }
+    <span class="kw">return</span> {name: <span class="kw">await</span> metric.single_turn_ascore(sample) <span class="kw">for</span> name, metric <span class="kw">in</span> metrics.items()}</code></pre>
         </div>
       </div>
     </section>

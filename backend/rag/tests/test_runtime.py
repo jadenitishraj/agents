@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from backend.rag.runtime import collection_name
+from backend.rag.indexer import _collection_name as collection_name
 
 
 class RuntimeTests(unittest.TestCase):

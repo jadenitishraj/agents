@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.rag.ingestion import load_local_sources, move_processed
+from backend.rag.parser import load_local_sources, move_processed
 
 
 class IngestionTests(unittest.TestCase):
