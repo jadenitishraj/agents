@@ -300,8 +300,8 @@ pre { padding: 16px; margin: 0; overflow-x: auto; font: 400 13px/1.6 'JetBrains 
       <div class="stat"><div class="num">2</div><div class="label">retrieval families</div></div>
       <div class="stat"><div class="num">1</div><div class="label">grounded answer</div></div>
     </div>
-    <div class="scroll-hint">Start lesson</div>
   </div>
+  <div class="scroll-hint">Start lesson</div>
 </section>
 
 <nav class="tabs">
@@ -348,22 +348,21 @@ pre { padding: 16px; margin: 0; overflow-x: auto; font: 400 13px/1.6 'JetBrains 
         </div>
         <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> The orchestration layer is purely about coordinating the specialized files. Notice how it seamlessly runs parsing, chunking, and index creation before caching the entire corpus in memory so it can be queried multiple times without rebuilding.</p>
         <div class="code-container" style="margin-top:12px">
-          <div class="code-header">backend/rag/pipeline.py (The Orchestrator)</div>
-          <pre><code><span class="kw">def</span> <span class="fn">build_corpus</span>(question: <span class="cl">str</span>, sources: <span class="cl">list</span>[Source]) -> <span class="cl">IndexedCorpus</span>:
-    <span class="cm">"""Run the full pipeline: load local files, classify, chunk, index."""</span>
-    <span class="fn">print</span>(<span class="st">"\n=== Starting RAG Pipeline Build Phase ==="</span>)
+          <div class="code-header">backend/rag_v2/pipeline.py (The Persistent Ingestion Pipeline)</div>
+          <pre><code><span class="kw">def</span> <span class="fn">ingest_file</span>(file_path: <span class="cl">str</span>) -> <span class="cl">dict</span>:
+    <span class="cm">"""Takes a file, processes it, and saves it globally to the knowledge base."""</span>
+    <span class="fn">print</span>(f<span class="st">"\n=== Starting Upload Pipeline for: {file_path} ==="</span>)
     
-    <span class="cm"># Step 1: Parse & Classify sources (Markdown, PDF, Transcripts, etc.)</span>
-    classified = <span class="fn">classify_sources</span>(all_sources)
+    <span class="cm"># Step 1: Parse & Classify (PDFs, Markdown, Transcripts, etc.)</span>
+    parsed_dict = <span class="fn">parse_file</span>(file_path)
     
-    <span class="cm"># Step 2: Split documents using their assigned strategy (Semantic, Hierarchical, etc.)</span>
-    documents, nodes = <span class="fn">chunk_sources</span>(classified)
+    <span class="cm"># Step 2: Chunk documents based on the chosen strategy</span>
+    chunk_dicts = <span class="fn">chunk_document</span>(parsed_dict)
     
-    <span class="cm"># Step 3: Embed text and build the 3 indexes (Vector, BM25, Graph)</span>
-    storage, vector, graph, processed = <span class="fn">build_indexes</span>(question, all_sources, documents, nodes)
+    <span class="cm"># Step 3: Save to Global Vector, Graph, and BM25 Stores</span>
+    <span class="fn">index_chunks</span>(chunk_dicts)
     
-    <span class="fn">print</span>(<span class="st">"Build complete! Corpus stored in memory."</span>)
-    <span class="kw">return</span> <span class="cl">IndexedCorpus</span>(question, all_sources, classified, documents, processed, storage, vector, graph)</code></pre>
+    <span class="kw">return</span> {<span class="st">"status"</span>: <span class="st">"success"</span>, <span class="st">"chunks_created"</span>: <span class="cl">len</span>(chunk_dicts)}</code></pre>
         </div>
       </div>
     </section>
@@ -396,32 +395,46 @@ pre { padding: 16px; margin: 0; overflow-x: auto; font: 400 13px/1.6 'JetBrains 
         <table class="compare">
           <thead><tr><th>Strategy</th><th>Best for</th><th>Risk it avoids</th></tr></thead>
           <tbody>
-            <tr><td>Sentence splitting</td><td>Clean prose and simple articles.</td><td>Breaking sentences in unnatural places.</td></tr>
-            <tr><td>Semantic splitting</td><td>Interviews, transcripts, and topic-shifting text.</td><td>Mixing unrelated ideas in one chunk.</td></tr>
-            <tr><td>Hierarchical splitting</td><td>Dense reports, policies, and long references.</td><td>Losing the connection between section and detail.</td></tr>
-            <tr><td>Token splitting</td><td>Logs, traces, and compact technical text.</td><td>Overrunning the model context budget.</td></tr>
+            <tr><td>Sentence splitting</td><td>Clean prose and simple articles.</td><td>Breaking sentences in unnatural places, keeping thoughts intact.</td></tr>
+            <tr><td>Semantic splitting</td><td>Interviews, transcripts, and topic-shifting text.</td><td>Mixing unrelated ideas in one chunk. Uses embeddings to detect topic shifts.</td></tr>
+            <tr><td>Hierarchical splitting</td><td>Dense reports, policies, and long references.</td><td>Losing the connection between section and detail. Maintains parent-child relationships.</td></tr>
+            <tr><td>Token splitting</td><td>Logs, traces, and compact technical text.</td><td>Overrunning the model context budget, ensuring exact size limits.</td></tr>
+            <tr><td>Markdown-aware splitting</td><td>Markdown files, readmes, and wikis.</td><td>Orphaning bullet points or splitting code blocks in half.</td></tr>
+            <tr><td>HTML/DOM-aware splitting</td><td>Web scraping and raw HTML documents.</td><td>Injecting useless tags into chunks; groups by logical divs/paragraphs.</td></tr>
+            <tr><td>Fixed-size with overlap</td><td>General unstructured data as a fallback.</td><td>Losing context at the exact boundary of a chunk by bleeding into the next.</td></tr>
+            <tr><td>Paragraph splitting</td><td>Books, essays, and dense literature.</td><td>Separating closely related sentences that form a single cohesive argument.</td></tr>
+            <tr><td>Regex/Delimiter splitting</td><td>Custom formats, EDI, or structured logs.</td><td>Breaking custom data formats by splitting indiscriminately.</td></tr>
+            <tr><td>AST (Code) splitting</td><td>Python, JS, Java source code.</td><td>Splitting a function or class definition in half, making it uncompilable or confusing.</td></tr>
+            <tr><td>Topic modeling splitting</td><td>Extremely long, rambling, unformatted text.</td><td>Arbitrary splits. Uses NLP to group by statistical topic coherence.</td></tr>
+            <tr><td>Table-aware splitting</td><td>Financial reports, CSVs, and Excel dumps.</td><td>Turning rows and columns into unreadable soup; keeps headers attached to rows.</td></tr>
+            <tr><td>Entity-based splitting</td><td>Knowledge graphs and intelligence reports.</td><td>Losing track of *who* is related to *what*. Groups text by the subjects mentioned.</td></tr>
+            <tr><td>Sliding window splitting</td><td>Time-series data and chat histories.</td><td>Losing the conversational flow. Keeps a rolling memory of the last N messages.</td></tr>
+            <tr><td>Page-level splitting</td><td>Scanned PDFs and physical document archives.</td><td>Mixing footnotes or page numbers across multiple pages of context.</td></tr>
+            <tr><td>Heading-level splitting</td><td>Legal contracts and technical manuals.</td><td>Losing the context of "Article 4, Section 2" when retrieving a deep sub-clause.</td></tr>
+            <tr><td>Agentic/LLM-driven chunking</td><td>Complex, high-value unstructured text.</td><td>Rigid rules failing. An LLM reads the text and decides where the logical breaks are.</td></tr>
           </tbody>
         </table>
         <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> Notice how the chunker avoids hardcoding a single splitting rule. By reading the classification tag from the parser, it dynamically selects between Semantic chunking (for transcripts), Hierarchical chunking (for long reports), or basic fallback strategies.</p>
         <div class="code-container" style="margin-top:12px">
-          <div class="code-header">backend/rag/chunker.py (Dynamic Splitting Strategies)</div>
-          <pre><code><span class="kw">def</span> <span class="fn">_build_splitter</span>(strategy: <span class="cl">str</span>):
-    <span class="cm">"""Return the right LlamaIndex node parser for the given strategy."""</span>
+          <div class="code-header">backend/rag_v2/chunker.py (Dynamic Splitting Strategies)</div>
+          <pre><code><span class="kw">def</span> <span class="fn">chunk_document</span>(parsed_doc: <span class="cl">dict</span>) -> <span class="cl">list</span>[<span class="cl">dict</span>]:
+    <span class="cm">"""Split a parsed document into chunks based on its classified strategy."""</span>
+    strategy = parsed_doc[<span class="st">"chunk_strategy"</span>]
+    
     <span class="kw">if</span> strategy == <span class="st">"markdown"</span>:
-        <span class="kw">return</span> <span class="cl">MarkdownNodeParser</span>()
-    <span class="kw">if</span> strategy == <span class="st">"html"</span>:
-        <span class="kw">return</span> <span class="cl">HTMLNodeParser</span>()
-    <span class="kw">if</span> strategy == <span class="st">"semantic"</span>:
-        <span class="cm"># Semantic chunking: only splits when embedding similarity drops below 90th percentile</span>
-        <span class="kw">return</span> <span class="cl">SemanticSplitterNodeParser</span>(breakpoint_percentile_threshold=<span class="st">90</span>)
-    <span class="kw">if</span> strategy == <span class="st">"hierarchical"</span>:
-        <span class="cm"># Multi-level chunks: coarse (1536) → medium (768) → fine (256)</span>
-        <span class="kw">return</span> <span class="cl">HierarchicalNodeParser</span>.from_defaults(chunk_sizes=[<span class="st">1536</span>, <span class="st">768</span>, <span class="st">256</span>])
-    <span class="kw">if</span> strategy == <span class="st">"token"</span>:
-        <span class="cm"># Fixed-size windows for logs</span>
-        <span class="kw">return</span> <span class="cl">TokenTextSplitter</span>(chunk_size=<span class="st">512</span>, chunk_overlap=<span class="st">50</span>)
-    <span class="cm"># Default fallback</span>
-    <span class="kw">return</span> <span class="cl">SentenceSplitter</span>(chunk_size=<span class="st">768</span>, chunk_overlap=<span class="st">80</span>)</code></pre>
+        splitter = <span class="cl">MarkdownNodeParser</span>()
+    <span class="kw">elif</span> strategy == <span class="st">"html"</span>:
+        splitter = <span class="cl">HTMLNodeParser</span>()
+    <span class="kw">elif</span> strategy == <span class="st">"token"</span>:
+        splitter = <span class="cl">TokenTextSplitter</span>(chunk_size=<span class="st">512</span>, chunk_overlap=<span class="st">50</span>)
+    <span class="kw">elif</span> strategy == <span class="st">"semantic"</span>:
+        <span class="cm"># Semantic chunking splits when embedding similarity drops</span>
+        splitter = <span class="cl">SemanticSplitterNodeParser</span>(breakpoint_percentile_threshold=<span class="st">90</span>)
+    <span class="kw">else</span>:
+        splitter = <span class="cl">SentenceSplitter</span>(chunk_size=<span class="st">768</span>, chunk_overlap=<span class="st">80</span>)
+        
+    doc = <span class="cl">Document</span>(text=parsed_doc[<span class="st">"text"</span>], metadata=parsed_doc[<span class="st">"metadata"</span>])
+    <span class="kw">return</span> [{<span class="st">"id"</span>: n.node_id, <span class="st">"text"</span>: n.text, <span class="st">"metadata"</span>: n.metadata} <span class="kw">for</span> n <span class="kw">in</span> splitter.get_nodes_from_documents([doc])]</code></pre>
         </div>
       </div>
     </section>
@@ -453,13 +466,13 @@ pre { padding: 16px; margin: 0; overflow-x: auto; font: 400 13px/1.6 'JetBrains 
             <h3>Graph database</h3>
             <p>Graphs store entities and relationships. They help answer multi-hop questions where the connection matters more than word similarity.</p>
             <div class="nodes">
-              <div class="edge" style="left:105px;top:58px;width:150px;transform:rotate(10deg)"></div>
-              <div class="edge" style="left:250px;top:88px;width:145px;transform:rotate(24deg)"></div>
-              <div class="edge" style="left:120px;top:130px;width:170px;transform:rotate(-18deg)"></div>
-              <div class="node" style="left:30px;top:38px">Person</div>
-              <div class="node" style="left:240px;top:58px">Company</div>
-              <div class="node" style="left:405px;top:124px">Product</div>
-              <div class="node" style="left:160px;top:140px">Policy</div>
+              <div class="edge" style="left:63px;top:58px;width:90px;transform:rotate(10deg)"></div>
+              <div class="edge" style="left:150px;top:88px;width:87px;transform:rotate(24deg)"></div>
+              <div class="edge" style="left:72px;top:130px;width:102px;transform:rotate(-18deg)"></div>
+              <div class="node" style="left:18px;top:38px">Person</div>
+              <div class="node" style="left:144px;top:58px">Company</div>
+              <div class="node" style="left:243px;top:124px">Product</div>
+              <div class="node" style="left:96px;top:140px">Policy</div>
             </div>
             <div class="pill-row"><span class="pill">nodes</span><span class="pill">edges</span><span class="pill">multi-hop</span></div>
           </div>
@@ -475,28 +488,22 @@ pre { padding: 16px; margin: 0; overflow-x: auto; font: 400 13px/1.6 'JetBrains 
         </div>
         <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> The indexer iterates over the chunks just once, but maps them into three distinct mathematical representations: a Vector Index for meaning, a Knowledge Graph for connections, and a BM25 store (handled dynamically) for exact string matching. Notice how BM25 isn't saved to a database—it's built in-memory on the fly during retrieval using the `processed_nodes` returned here.</p>
         <div class="code-container" style="margin-top:12px">
-          <div class="code-header">backend/rag/indexer.py (Tri-Index Creation)</div>
-          <pre><code><span class="kw">def</span> <span class="fn">build_indexes</span>(question, sources, documents, nodes):
-    <span class="fn">print</span>(<span class="st">"Building 3 indexes (Vector, BM25 context, Graph) from chunks..."</span>)
-    storage = <span class="fn">_build_storage</span>(question, sources)
-
-    <span class="cm"># 1. Pipeline embeds the chunks via OpenAI models</span>
-    <span class="fn">print</span>(<span class="st">"  → Generating embeddings for Vector index..."</span>)
-    pipeline = <span class="cl">IngestionPipeline</span>(transformations=[<span class="fn">get_llama_embed_model</span>()])
-    processed_nodes = <span class="cl">list</span>(pipeline.run(nodes=nodes))
-
-    <span class="cm"># 2. Vector Index stores embeddings in ChromaDB</span>
-    vector_index = <span class="cl">VectorStoreIndex</span>(processed_nodes, storage_context=storage)
-
-    <span class="cm"># 3. Knowledge Graph Index extracts entity triplets into Neo4j (or local graph)</span>
-    <span class="fn">print</span>(<span class="st">"  → Extracting entity triplets for Knowledge Graph index..."</span>)
-    graph_index = <span class="cl">KnowledgeGraphIndex</span>.from_documents(
-        documents, storage_context=storage, max_triplets_per_chunk=<span class="st">2</span>
-    )
-
-    <span class="cm"># Note: BM25 doesn't need to be saved to a database here. </span>
-    <span class="cm"># It is built dynamically in-memory from 'processed_nodes' during the Retrieval step!</span>
-    <span class="kw">return</span> storage, vector_index, graph_index, processed_nodes</code></pre>
+          <div class="code-header">backend/rag_v2/indexer.py (Tri-Index Creation)</div>
+          <pre><code><span class="kw">def</span> <span class="fn">index_chunks</span>(chunks: <span class="cl">list</span>[<span class="cl">dict</span>]):
+    <span class="cm">"""Save chunks persistently to global Vector, Graph, and BM25 stores."""</span>
+    storage = <span class="fn">get_global_storage</span>()
+    
+    <span class="cm"># 1. Vector Store (Chroma)</span>
+    vector_index = <span class="cl">VectorStoreIndex</span>.from_vector_store(storage.vector_store)
+    <span class="kw">for</span> c <span class="kw">in</span> chunks:
+        vector_index.insert(<span class="cl">TextNode</span>(id_=c[<span class="st">"id"</span>], text=c[<span class="st">"text"</span>], metadata=c[<span class="st">"metadata"</span>]))
+    
+    <span class="cm"># 2. Knowledge Graph Index extracts entity triplets</span>
+    graph_index = <span class="cl">KnowledgeGraphIndex</span>.from_documents(documents, storage_context=storage)
+    
+    <span class="cm"># 3. BM25 keyword index is persisted to a JSON file</span>
+    <span class="kw">with open</span>(GLOBAL_STORAGE_DIR / <span class="st">"bm25_index.json"</span>, <span class="st">"w"</span>) <span class="kw">as</span> f:
+        json.<span class="fn">dump</span>(all_chunks, f)</code></pre>
         </div>
       </div>
     </section>
@@ -528,26 +535,24 @@ pre { padding: 16px; margin: 0; overflow-x: auto; font: 400 13px/1.6 'JetBrains 
         </div>
         <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> The retriever is the heaviest lifter. It first expands the query using HyDE, then hits the Vector and BM25 indexes simultaneously. It merges those candidates using Reciprocal Rank Fusion, adds Graph hits, and finally runs a cross-encoder LLM to pick only the top 3 best chunks.</p>
         <div class="code-container" style="margin-top:12px">
-          <div class="code-header">backend/rag/retriever.py (Hybrid Fusion & Rerank)</div>
-          <pre><code><span class="kw">def</span> <span class="fn">retrieve_context</span>(corpus: <span class="cl">IndexedCorpus</span>, question: <span class="cl">str</span>):
-    <span class="cm"># 1. Generate hypothetical answer (HyDE)</span>
-    <span class="fn">print</span>(<span class="st">"  → Generating HyDE query expansion..."</span>)
-    query_bundle = <span class="fn">_build_query_bundle</span>(question)
-
-    <span class="cm"># 2. Setup keyword (BM25) and semantic (Vector) search</span>
+          <div class="code-header">backend/rag_v2/retriever.py (Hybrid Fusion & Rerank)</div>
+          <pre><code><span class="kw">def</span> <span class="fn">search_global_db</span>(query: <span class="cl">str</span>, top_k: <span class="cl">int</span> = <span class="st">3</span>) -> <span class="cl">dict</span>:
+    <span class="cm"># 1. Setup keyword (BM25) and semantic (Vector) search</span>
     <span class="fn">print</span>(<span class="st">"  → Searching Vector and BM25 indexes..."</span>)
-    vector = corpus.vector_index.as_retriever(similarity_top_k=<span class="st">10</span>)
-    bm25 = <span class="cl">BM25Retriever</span>.from_defaults(nodes=corpus.nodes, similarity_top_k=<span class="st">10</span>)
-
-    <span class="cm"># 3. Fuse Vector + BM25 using Reciprocal Rank Fusion</span>
-    <span class="fn">print</span>(<span class="st">"  → Searching Knowledge Graph & fusing results..."</span>)
-    fusion = <span class="cl">QueryFusionRetriever</span>([vector, bm25], mode=<span class="st">"reciprocal_rerank"</span>)
-    candidates = <span class="cl">list</span>(fusion.retrieve(query_bundle)) + <span class="fn">_graph_hits</span>(corpus, question)
-
-    <span class="cm"># 4. LLM Reranking of final candidates</span>
+    vector_retriever = vector_index.as_retriever(similarity_top_k=top_k * <span class="st">2</span>)
+    bm25_retriever = <span class="cl">BM25Retriever</span>.from_defaults(nodes=nodes, similarity_top_k=top_k * <span class="st">2</span>)
+    
+    <span class="cm"># 2. Fuse Vector + BM25 using Reciprocal Rank Fusion</span>
+    <span class="fn">print</span>(<span class="st">"  → Fusing Vector and BM25 results..."</span>)
+    fusion = <span class="cl">QueryFusionRetriever</span>([vector_retriever, bm25_retriever], mode=<span class="st">"reciprocal_rerank"</span>)
+    candidates = fusion.retrieve(<span class="cl">QueryBundle</span>(query_str=query))
+    
+    <span class="cm"># 3. LLM Reranking of final candidates</span>
     <span class="fn">print</span>(<span class="st">"  → LLM reranking top candidates to find the best chunks..."</span>)
-    reranker = <span class="cl">LLMRerank</span>(llm=<span class="fn">get_llama_llm</span>(), choice_batch_size=<span class="st">5</span>, top_n=<span class="st">3</span>)
-    <span class="kw">return</span> <span class="fn">_contexts_and_citations</span>(reranker.postprocess_nodes(candidates, query_bundle))</code></pre>
+    reranker = <span class="cl">LLMRerank</span>(llm=<span class="fn">get_llama_llm</span>(), choice_batch_size=<span class="st">5</span>, top_n=top_k)
+    best_nodes = reranker.postprocess_nodes(candidates, query_bundle)
+    
+    <span class="kw">return</span> {<span class="st">"query"</span>: query, <span class="st">"results"</span>: [{<span class="st">"text"</span>: n.node.text} <span class="kw">for</span> n <span class="kw">in</span> best_nodes]}</code></pre>
         </div>
         <div class="card accent" style="margin-top:24px">
           <h3>Citations complete the trust loop</h3>
@@ -559,20 +564,24 @@ pre { padding: 16px; margin: 0; overflow-x: auto; font: 400 13px/1.6 'JetBrains 
         </div>
         <p style="margin-top:32px; color:var(--ink-dim); font-size:16px;"><strong>Code Breakdown:</strong> The evaluator uses Ragas to act as an impartial judge. It spins up 4 independent LLM evaluations to test the answer against the retrieved context. If Faithfulness drops, the LLM hallucinated. If Context Precision drops, the retriever surfaced bad chunks.</p>
         <div class="code-container" style="margin-top:12px">
-          <div class="code-header">backend/rag/evaluator.py (Ragas Metrics)</div>
-          <pre><code><span class="kw">async def</span> <span class="fn">_score_async</span>(question, answer, contexts, reference):
+          <div class="code-header">backend/rag_v2/ragas_evaluation.py (Ragas Metrics)</div>
+          <pre><code><span class="kw">def</span> <span class="fn">evaluate_ragas</span>(question: <span class="cl">str</span>, answer: <span class="cl">str</span>, contexts: <span class="cl">list</span>[<span class="cl">str</span>]) -> <span class="cl">dict</span>:
     <span class="fn">print</span>(<span class="st">"\n=== Starting Ragas Evaluation ==="</span>)
-    <span class="fn">print</span>(<span class="st">"  → Running LLM judges for Faithfulness, Relevance, Precision, and Recall..."</span>)
-    sample = <span class="cl">SingleTurnSample</span>(user_input=question, response=answer, retrieved_contexts=contexts, reference=reference)
+    dataset = <span class="cl">Dataset</span>.from_dict({
+        <span class="st">"question"</span>: [question],
+        <span class="st">"answer"</span>: [answer],
+        <span class="st">"contexts"</span>: [contexts],
+    })
     
     <span class="cm"># LLM-as-a-Judge computes these 4 independent scores</span>
-    metrics = {
-        <span class="st">"faithfulness"</span>: <span class="cl">Faithfulness</span>(llm=llm),
-        <span class="st">"answer_relevance"</span>: <span class="cl">ResponseRelevancy</span>(llm=llm, embeddings=embeds),
-        <span class="st">"context_precision"</span>: <span class="cl">LLMContextPrecisionWithoutReference</span>(llm=llm),
-        <span class="st">"context_recall"</span>: <span class="cl">LLMContextRecall</span>(llm=llm),
-    }
-    <span class="kw">return</span> {name: <span class="kw">await</span> metric.single_turn_ascore(sample) <span class="kw">for</span> name, metric <span class="kw">in</span> metrics.items()}</code></pre>
+    metrics = [
+        faithfulness,
+        answer_relevancy,
+        context_precision,
+        context_recall
+    ]
+    
+    <span class="kw">return</span> <span class="fn">evaluate</span>(dataset, metrics=metrics, llm=<span class="fn">get_langchain_llm</span>())</code></pre>
         </div>
       </div>
     </section>
