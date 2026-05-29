@@ -118,12 +118,8 @@ async def research(req: ResearchRequest):
     final_state["duration_seconds"] = time.time() - start_time
     is_allowed, msg = is_safe(output_guard, final_state.get("answer", ""))
     final_state["final_answer"] = final_state.get("answer", "") if is_allowed else msg
-    final_state["rag_metrics"] = evaluate_answer(
-        final_state.get("question", ""),
-        final_state.get("final_answer", ""),
-        final_state.get("rag_contexts", []),
-        final_state.get("rag_reference", ""),
-    )
+    # Disabled on live calls to prevent latency. Run evaluation scripts to calculate metrics.
+    final_state["rag_metrics"] = {"note": "Ragas evaluation disabled on live requests to optimize speed. Use standalone benchmark scripts."}
 
     # Push Custom Metrics via OpenTelemetry
     llm_calls_counter.add(final_state.get("llm_calls", 0))
@@ -168,7 +164,7 @@ class RagSearchRequest(BaseModel):
     top_k: int = 5
 
 
-from backend.rag_v2.pipeline import ingest_file
+from backend.rag_v2.pipeline import ingest_file, search_rag
 
 @app.post("/rag/upload")
 async def rag_upload(file: UploadFile = File(...)):
@@ -206,31 +202,35 @@ async def rag_upload(file: UploadFile = File(...)):
 
 @app.post("/rag/search")
 async def rag_search(req: RagSearchRequest):
-    """Search the indexed corpus — pure retrieval, no answer generation."""
-    # Use latest corpus if none specified
-    corpus_id = req.corpus_id or (rag_registry.list_ids()[-1] if rag_registry.list_ids() else "")
-    if not corpus_id:
-        return JSONResponse(status_code=400, content={"error": "No corpus indexed. Upload a file first."})
-
-    corpus = rag_registry.get(corpus_id)
-    if corpus is None:
-        return JSONResponse(status_code=404, content={"error": f"Corpus '{corpus_id}' not found."})
-
-    logger.info(f"RAG search: corpus={corpus_id}, query={req.query!r}")
+    """Search the indexed corpus — pure retrieval, no answer generation using RAG v2."""
+    logger.info(f"RAG search: query={req.query!r}")
 
     start = time.time()
     try:
-        results = search_corpus(corpus, req.query, top_k=req.top_k)
+        search_result = search_rag(req.query, top_k=req.top_k)
     except Exception as e:
         logger.error(f"RAG search failed: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
     elapsed = time.time() - start
-    logger.info(f"RAG search complete: {len(results)} results in {elapsed:.2f}s")
+    logger.info(f"RAG search complete in {elapsed:.2f}s")
+
+    # Map the search_rag output into the structure the frontend expects
+    results = [
+        {
+            "title": r.get("source", "Global DB"),
+            "text": r.get("text", ""),
+            "score": r.get("score", 1.0),
+            "category": "Document",
+            "chunk_strategy": "Auto"
+        }
+        for r in search_result.get("results", [])
+    ]
 
     return {
-        "corpus_id": corpus_id,
+        "corpus_id": "global",
         "query": req.query,
         "results": results,
+        "joined_text": search_result.get("joined_text", ""),
         "elapsed_seconds": round(elapsed, 2),
     }

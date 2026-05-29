@@ -63,7 +63,12 @@ def search_global_db(query: str, top_k: int = 3) -> dict:
         })
         
     print(f"  → Found {len(results)} relevant chunks!")
+    
+    # Concatenate all chunk texts with newlines as a single text block
+    joined_text = "\n".join([r["text"] for r in results])
+    
     return {
         "query": query, 
-        "results": results
+        "results": results,
+        "joined_text": joined_text
     }

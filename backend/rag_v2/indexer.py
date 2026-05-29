@@ -75,7 +75,7 @@ def index_chunks(chunks: list[dict]):
             nodes,
             storage_context=storage,
             llm=get_llama_llm(),
-            max_triplets_per_chunk=2,
+            max_triplets_per_chunk=2, #range is 5 to 15
             include_embeddings=True,
             show_progress=False
         )
