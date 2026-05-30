@@ -45,15 +45,24 @@ agents/
    pip install -r backend/requirements.txt
    ```
 
-3. **Run the server:**
+3. **Run the server (Backend + Frontend):**
    ```bash
-   python main.py
+   .venv/bin/python main.py
    ```
 
 4. **Open in browser:**
    ```
    http://localhost:8000/static/index.html
    ```
+
+## Advanced Testing
+
+### Live Ragas Integration Test
+To manually run the Ragas AI-as-a-Judge test (which triggers the live RAG global database and grades the AI's generated answer using OpenAI), open a new terminal window in the project root and run:
+
+```bash
+.venv/bin/python -m backend.rag_v2.ragas_evaluation
+```
 
 ## How It Works
 
