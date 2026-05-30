@@ -27,14 +27,7 @@ from pydantic import BaseModel
 
 from backend.guardrails.pipeline import input_guard, output_guard, is_safe
 from backend.orchestrator import compile_graph, create_initial_state
-from backend.rag import evaluate_answer
-from backend.rag.parser import classify_sources
-from backend.rag.chunker import chunk_sources
-from backend.rag.pipeline import build_corpus
-from backend.rag.retriever import search_corpus
-from backend.rag import pipeline as rag_registry
-from backend.rag.models import IndexedCorpus, Source
-from backend.rag.llm import configure_settings
+
 
 # --- Observability Setup ---
 from logger.loki import logger
