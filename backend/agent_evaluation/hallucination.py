@@ -66,4 +66,37 @@ def evaluate_hallucination_and_faithfulness(
 #
 # 3. Code Integration:
 #    from deepeval.metrics.beta import TaskCompletionMetric, StepEfficiencyMetric
+
+
+#
+# 4. ToolCorrectnessMetric (per-agent tool-call audit):
+#    For each agent in the graph (Searcher, Reader, Writer, Critic), verify
+#    that it called the right tool with the right arguments. Catches the
+#    "wrong tool" and "wrong args" failure modes that quality metrics miss.
+#
+#    from deepeval.metrics import ToolCorrectnessMetric
+#
+# 5. Per-agent output evaluation via @observe() tracing:
+#    Decorate each LangGraph node so DeepEval captures its inputs/outputs
+#    as a span, then attach the right metric to each agent:
+#      - Searcher  -> Contextual Precision + Recall (retrieval quality)
+#      - Reader    -> Faithfulness (extracted facts must be in source)
+#      - Writer    -> Faithfulness + Hallucination (no fabrication in prose)
+#      - Critic    -> Custom G-Eval against a human-reviewer baseline
+#
+#    from deepeval.tracing import observe
+#
+#    @observe()
+#    def searcher_node(state):
+#        ...
+#
+# 6. Graph trajectory / routing check:
+#    In LangGraph the graph branches (Critic approves -> END, rejects -> back
+#    to Writer). Capture the actual node sequence and compare against the
+#    expected path. Catches routing bugs that output-quality metrics miss
+#    entirely — the agent can produce a fine answer via the wrong control flow.
+#
+#    Implement as a custom check: log final_state["trajectory"] and assert it
+#    matches the expected DAG path for that test case.
 # =====================================================================
+ 
