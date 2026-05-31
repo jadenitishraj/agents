@@ -66,8 +66,6 @@ def evaluate_hallucination_and_faithfulness(
 #
 # 3. Code Integration:
 #    from deepeval.metrics.beta import TaskCompletionMetric, StepEfficiencyMetric
-
-
 #
 # 4. ToolCorrectnessMetric (per-agent tool-call audit):
 #    For each agent in the graph (Searcher, Reader, Writer, Critic), verify

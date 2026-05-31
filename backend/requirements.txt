@@ -26,3 +26,5 @@ deepeval>=4.0.0
 # For production: swap LLMRerank with a local BERT cross-encoder:
 # sentence-transformers>=3.0.0
 python-multipart>=0.0.9
+rouge-score>=0.1.2
+nltk>=3.9.4

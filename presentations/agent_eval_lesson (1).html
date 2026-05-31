@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evaluating Agents · A Practitioner's Field Guide · BLEU · ROUGE · Pass@k · Hallucination · EU AI Act · DPDP · DeepEval</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: #0a0a14;
+  --bg-2: #11111f;
+  --ink: #f4f1ea;
+  --ink-dim: #a8a3b8;
+  --ink-faint: #5a5670;
+
+  --c-bleu:    #a78bfa;   /* violet — BLEU */
+  --c-rouge:   #f472b6;   /* pink — ROUGE */
+  --c-passk:   #14b8a6;   /* teal — pass@k */
+  --c-halluc:  #fb923c;   /* orange — hallucination */
+  --c-faith:   #34d399;   /* green — faithfulness */
+  --c-eu:      #60a5fa;   /* blue — EU */
+  --c-dpdp:    #facc15;   /* yellow — DPDP */
+  --c-guard:   #c084fc;   /* purple — guardrails */
+  --c-deepeval:#10b981;   /* emerald — deepeval */
+  --c-good:    #34d399;
+  --c-bad:     #ef4444;
+  --c-warn:    #f59e0b;
+
+  --s1:  #4338ca;
+  --s2:  #6d28d9;
+  --s3:  #9333ea;
+  --s4:  #c026d3;
+  --s5:  #db2777;
+  --s6:  #e11d48;
+  --s7:  #ea580c;
+  --s8:  #f59e0b;
+
+  --code-accent: #10b981;
+  --code-bg: #07121a;
+  --code-border: rgba(16,185,129,0.25);
+
+  --card-bg: rgba(255,255,255,0.03);
+  --card-border: rgba(255,255,255,0.08);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family: 'Inter Tight', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.6;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse at top, rgba(67,56,202,0.18), transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(234,88,12,0.10), transparent 50%);
+  background-attachment: fixed;
+}
+.container{ max-width:1280px; margin:0 auto; padding:0 32px; position:relative; z-index:2; }
+
+/* === Typography === */
+.display{ font-family:'Fraunces',serif; font-weight:900; letter-spacing:-0.04em; line-height:0.95; }
+.serif{ font-family:'Fraunces',serif; }
+.mono{ font-family:'JetBrains Mono',monospace; }
+.label{ font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:0.18em; font-size:11px; color:var(--ink-dim); }
+
+/* === Hero === */
+.hero{ min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:80px 0 60px; position:relative; }
+.hero .stage-num{ font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:14px; color:var(--ink-faint); margin-bottom:24px; }
+.hero h1{
+  font-size: clamp(44px, 8.5vw, 116px);
+  margin-bottom:32px;
+  background: linear-gradient(135deg, var(--s1) 0%, var(--s4) 50%, var(--s7) 100%);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+.hero h1 em{ font-style:italic; font-weight:300; background:none; -webkit-text-fill-color:var(--ink); color:var(--ink); }
+.hero .sub{ font-size:clamp(18px,2.2vw,24px); max-width:820px; color:var(--ink-dim); margin-bottom:56px; font-weight:300; }
+.stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:24px; max-width:980px; }
+.stat{ border-left:2px solid var(--card-border); padding-left:16px; }
+.stat .num{ font-family:'Fraunces',serif; font-weight:800; font-size:34px; letter-spacing:-0.03em; color:var(--ink); }
+.stat .label{ margin-top:4px; }
+.scroll-hint{ position:absolute; bottom:40px; left:50%; transform:translateX(-50%); font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:var(--ink-faint); animation:bob 2s ease-in-out infinite; }
+@keyframes bob{ 0%,100%{transform:translate(-50%,0);} 50%{transform:translate(-50%,8px);} }
+
+/* === Stage Wrapper === */
+.stage{ padding:100px 0; position:relative; border-top:1px solid var(--card-border); }
+.stage-header{ display:grid; grid-template-columns:80px 1fr; gap:24px; margin-bottom:40px; align-items:start; }
+.stage-num-big{ font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:64px; line-height:1; background:var(--stage-color,var(--s1)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.stage-title{ font-family:'Fraunces',serif; font-weight:800; font-size:clamp(30px,5vw,52px); letter-spacing:-0.03em; line-height:1.05; margin-bottom:12px; }
+.stage-title em{ font-style:italic; font-weight:300; }
+.stage-kicker{ font-size:17px; color:var(--ink-dim); font-weight:300; max-width:820px; }
+.stage-kicker code{ font-family:'JetBrains Mono',monospace; font-size:14px; background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:3px; color:var(--ink); }
+
+/* === Prose === */
+.prose{ max-width:880px; font-size:17px; color:var(--ink-dim); line-height:1.75; }
+.prose p{ margin-bottom:18px; }
+.prose strong, .prose b{ color:var(--ink); font-weight:600; }
+.prose code{ font-family:'JetBrains Mono',monospace; font-size:14px; background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:3px; color:#6ee7b7; }
+.prose .big{ font-size:19px; color:var(--ink); }
+.lead{ font-family:'Fraunces',serif; font-size:clamp(20px,2.6vw,26px); font-weight:300; line-height:1.45; color:var(--ink); max-width:880px; margin-bottom:28px; }
+.lead em{ font-style:italic; }
+
+/* === Card === */
+.card{ background:var(--card-bg); border:1px solid var(--card-border); border-radius:6px; padding:28px; position:relative; backdrop-filter:blur(10px); }
+.card.accent{ border-left:3px solid var(--stage-color,var(--s1)); }
+.card + .card{ margin-top:20px; }
+.card h4{ font-family:'Fraunces',serif; font-weight:700; font-size:21px; margin-bottom:10px; color:var(--ink); }
+
+/* === Vocab box (new) === */
+.vocab{
+  margin:24px 0 36px;
+  padding:24px 28px;
+  background:linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  border-left:3px solid var(--stage-color, var(--s1));
+  border-radius:0 6px 6px 0;
+}
+.vocab .tag{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--stage-color, var(--s1)); margin-bottom:18px; font-weight:700; }
+.vocab .vlist{ display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:14px 32px; }
+.vocab .vterm{ font-size:14px; line-height:1.6; color:var(--ink-dim); }
+.vocab .vterm b{ font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--ink); display:block; margin-bottom:3px; letter-spacing:0.02em; }
+
+/* === Summary box (new) === */
+.summary{
+  margin-top:44px;
+  padding:30px 34px;
+  background:rgba(255,255,255,0.035);
+  border:1px solid var(--card-border);
+  border-top:3px solid var(--stage-color, var(--s1));
+  border-radius:6px;
+}
+.summary .stag{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--stage-color, var(--s1)); margin-bottom:14px; font-weight:700; }
+.summary p{ font-family:'Fraunces',serif; font-size:19px; line-height:1.55; font-weight:300; color:var(--ink); }
+.summary p em{ font-style:italic; }
+.summary p b{ font-weight:700; color:var(--ink); }
+.summary p + p{ margin-top:14px; }
+
+/* === Callout / analogy === */
+.analogy{ margin:28px 0; padding:22px 26px; background:linear-gradient(90deg, rgba(167,139,250,0.10), rgba(167,139,250,0.02)); border-left:3px solid var(--c-bleu); border-radius:0 6px 6px 0; }
+.analogy .tag{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--c-bleu); margin-bottom:8px; }
+.analogy p{ font-family:'Fraunces',serif; font-size:19px; font-weight:300; line-height:1.5; color:var(--ink); margin:0; }
+.analogy em{ font-style:italic; }
+
+/* === Notes === */
+.notes{ display:flex; flex-direction:column; gap:14px; margin-top:8px; }
+.note{ font-size:13.5px; line-height:1.7; color:var(--ink-dim); padding:14px 18px; background:rgba(255,255,255,0.02); border-left:2px solid; border-radius:0 3px 3px 0; }
+.note .key{ font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:var(--ink); display:block; margin-bottom:4px; letter-spacing:0.05em; }
+.note b{ color:var(--ink); }
+.note.r{ border-color:var(--c-passk); } .note.r .key{ color:var(--c-passk); }
+.note.a{ border-color:var(--c-bleu); } .note.a .key{ color:var(--c-bleu); }
+.note.t{ border-color:var(--s8); } .note.t .key{ color:#fde047; }
+.note.w{ border-color:var(--c-warn); } .note.w .key{ color:var(--c-warn); }
+.note.g{ border-color:var(--c-good); } .note.g .key{ color:var(--c-good); }
+.note.d{ border-color:var(--c-bad); } .note.d .key{ color:#fca5a5; }
+
+/* === Two/three col === */
+.two-col{ display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:stretch; margin-top:8px; }
+.three-col{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:8px; }
+.four-col{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-top:8px; }
+
+/* === Decision table === */
+.dtable{ width:100%; border-collapse:separate; border-spacing:0; font-size:14px; margin-top:8px; }
+.dtable th{ text-align:left; padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-dim); border-bottom:1px solid var(--card-border); }
+.dtable td{ padding:14px 16px; border-bottom:1px solid var(--card-border); color:var(--ink-dim); line-height:1.55; vertical-align:top; }
+.dtable td.k{ font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--ink); font-weight:600; white-space:nowrap; }
+.dtable td b{ color:var(--ink); }
+.dtable tr:hover td{ background:rgba(255,255,255,0.02); }
+.dtable td.good{ color:var(--c-good); }
+.dtable td.bad{ color:#fca5a5; }
+.dtable td.warn{ color:var(--c-warn); }
+
+/* === VS panels === */
+.vs-grid{ display:grid; grid-template-columns:1fr 60px 1fr; gap:0; align-items:stretch; margin-top:8px; }
+.vs-panel{ padding:28px; border-radius:8px; border:2px solid; height:100%; }
+.vs-panel h4{ font-family:'Fraunces',serif; font-weight:800; font-size:22px; margin-bottom:6px; }
+.vs-panel .vsub{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-dim); margin-bottom:16px; }
+.vs-panel ul{ list-style:none; display:flex; flex-direction:column; gap:10px; }
+.vs-panel li{ font-size:14px; color:var(--ink-dim); line-height:1.6; padding-left:20px; position:relative; }
+.vs-panel li::before{ content:'›'; position:absolute; left:0; font-weight:700; }
+.vs-mid{ text-align:center; font-family:'Fraunces',serif; font-style:italic; font-size:24px; color:var(--ink-faint); align-self:center; }
+.vs-panel.bleu{ background:rgba(167,139,250,0.06); border-color:rgba(167,139,250,0.35); }
+.vs-panel.bleu h4{ color:var(--c-bleu); } .vs-panel.bleu li::before{ color:var(--c-bleu); }
+.vs-panel.rouge{ background:rgba(244,114,182,0.06); border-color:rgba(244,114,182,0.35); }
+.vs-panel.rouge h4{ color:var(--c-rouge); } .vs-panel.rouge li::before{ color:var(--c-rouge); }
+.vs-panel.halluc{ background:rgba(251,146,60,0.06); border-color:rgba(251,146,60,0.35); }
+.vs-panel.halluc h4{ color:var(--c-halluc); } .vs-panel.halluc li::before{ color:var(--c-halluc); }
+.vs-panel.faith{ background:rgba(52,211,153,0.06); border-color:rgba(52,211,153,0.35); }
+.vs-panel.faith h4{ color:var(--c-faith); } .vs-panel.faith li::before{ color:var(--c-faith); }
+
+/* === Risk tier panels (EU) === */
+.tier-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; margin-top:8px; }
+.tier{ padding:24px; border-radius:8px; border:1px solid; background:rgba(255,255,255,0.02); border-top-width:4px; }
+.tier h5{ font-family:'Fraunces',serif; font-weight:800; font-size:20px; margin-bottom:4px; }
+.tier .tsub{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-dim); margin-bottom:16px; }
+.tier ul{ list-style:none; display:flex; flex-direction:column; gap:10px; }
+.tier li{ font-size:13.5px; color:var(--ink-dim); line-height:1.6; padding-left:18px; position:relative; }
+.tier li::before{ content:'●'; position:absolute; left:0; font-size:8px; top:7px; }
+.tier.t1{ border-color:rgba(239,68,68,0.4); border-top-color:var(--c-bad); }
+.tier.t1 h5{ color:#fca5a5; } .tier.t1 li::before{ color:var(--c-bad); }
+.tier.t2{ border-color:rgba(245,158,11,0.4); border-top-color:var(--c-warn); }
+.tier.t2 h5{ color:#fcd34d; } .tier.t2 li::before{ color:var(--c-warn); }
+.tier.t3{ border-color:rgba(96,165,250,0.4); border-top-color:var(--c-eu); }
+.tier.t3 h5{ color:#93c5fd; } .tier.t3 li::before{ color:var(--c-eu); }
+.tier.t4{ border-color:rgba(52,211,153,0.4); border-top-color:var(--c-good); }
+.tier.t4 h5{ color:#6ee7b7; } .tier.t4 li::before{ color:var(--c-good); }
+
+/* === Eiffel cases === */
+.case-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:18px; margin-top:18px; }
+.case{ padding:22px; border-radius:6px; background:rgba(255,255,255,0.025); border:1px solid var(--card-border); border-top:3px solid; }
+.case .cnum{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--ink-faint); margin-bottom:8px; }
+.case .ctitle{ font-family:'Fraunces',serif; font-weight:700; font-size:17px; margin-bottom:12px; }
+.case .cout{ font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:1.65; padding:10px 12px; background:rgba(0,0,0,0.3); border-radius:4px; color:#cbd5e1; margin-bottom:14px; }
+.case .cscore{ display:flex; gap:18px; font-size:13px; }
+.case .cscore span{ display:flex; align-items:center; gap:6px; }
+.case .cscore .lbl{ color:var(--ink-faint); font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; }
+.case .cscore .val.good{ color:var(--c-good); font-weight:700; }
+.case .cscore .val.bad{ color:#fca5a5; font-weight:700; }
+.case .cscore .val.warn{ color:var(--c-warn); font-weight:700; }
+.case.c1{ border-top-color:var(--c-good); }
+.case.c2{ border-top-color:var(--c-bad); }
+.case.c3{ border-top-color:var(--c-warn); }
+.case.c4{ border-top-color:var(--c-faith); }
+
+/* === Query fan diagram === */
+.query-fan{ display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; margin:20px 0; }
+.qcol{ padding:16px 12px; border-radius:6px; background:rgba(255,255,255,0.025); border:1px solid var(--card-border); text-align:center; }
+.qcol .qn{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-faint); margin-bottom:8px; letter-spacing:0.1em; }
+.qcol .qtxt{ font-size:12px; color:var(--ink-dim); line-height:1.4; margin-bottom:12px; min-height:48px; font-family:'JetBrains Mono',monospace; }
+.qcol .qchunks{ display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+.qcol .qch{ font-family:'JetBrains Mono',monospace; font-size:11px; padding:3px 6px; border-radius:3px; background:rgba(255,255,255,0.04); color:var(--ink-dim); }
+.qcol .qch.gold{ background:rgba(20,184,166,0.18); color:var(--c-passk); font-weight:700; border:1px solid rgba(20,184,166,0.4); }
+.qcol .qhit{ font-size:18px; }
+.qcol.pass{ border-color:rgba(20,184,166,0.35); }
+.qcol.fail{ opacity:0.6; }
+
+/* === Compliance layer stack === */
+.layer-stack{ display:flex; flex-direction:column; gap:14px; margin-top:8px; }
+.layer{ display:grid; grid-template-columns:140px 1fr 220px; gap:24px; padding:22px 26px; border-radius:6px; background:rgba(255,255,255,0.025); border:1px solid var(--card-border); border-left:4px solid; align-items:center; }
+.layer .lwhere{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:var(--ink-dim); }
+.layer .lname{ font-family:'Fraunces',serif; font-weight:700; font-size:19px; margin-bottom:4px; }
+.layer .ldesc{ font-size:13.5px; color:var(--ink-dim); line-height:1.6; }
+.layer .ltool{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-dim); text-align:right; line-height:1.6; }
+.layer .ltool b{ color:var(--ink); display:block; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:4px; }
+.layer.prev{ border-left-color:var(--c-good); }
+.layer.prev .lname{ color:var(--c-good); }
+.layer.guard{ border-left-color:var(--c-guard); }
+.layer.guard .lname{ color:var(--c-guard); }
+.layer.eval{ border-left-color:var(--c-deepeval); }
+.layer.eval .lname{ color:var(--c-deepeval); }
+
+/* === Audit ledger === */
+.ledger{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:8px; }
+.lcol{ padding:24px; border-radius:6px; background:rgba(255,255,255,0.025); border:1px solid var(--card-border); border-top:3px solid; }
+.lcol h5{ font-family:'Fraunces',serif; font-weight:700; font-size:19px; margin-bottom:6px; }
+.lcol .lsub{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:var(--ink-dim); margin-bottom:18px; }
+.lcol ul{ list-style:none; display:flex; flex-direction:column; gap:12px; }
+.lcol li{ font-size:13.5px; color:var(--ink-dim); line-height:1.6; padding-left:22px; position:relative; }
+.lcol.good{ border-top-color:var(--c-good); }
+.lcol.good h5{ color:#6ee7b7; } .lcol.good li::before{ content:'✓'; position:absolute; left:0; color:var(--c-good); font-weight:700; }
+.lcol.warn{ border-top-color:var(--c-warn); }
+.lcol.warn h5{ color:#fcd34d; } .lcol.warn li::before{ content:'!'; position:absolute; left:0; color:var(--c-warn); font-weight:700; }
+.lcol.bad{ border-top-color:var(--c-bad); }
+.lcol.bad h5{ color:#fca5a5; } .lcol.bad li::before{ content:'✗'; position:absolute; left:0; color:var(--c-bad); font-weight:700; }
+.lcol li b{ color:var(--ink); }
+.lcol li code{ font-family:'JetBrains Mono',monospace; font-size:12px; color:#6ee7b7; background:rgba(0,0,0,0.3); padding:1px 5px; border-radius:3px; }
+
+/* === Key takeaways === */
+.kt-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:24px; }
+.kt-card{ padding:28px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:6px; border-top:3px solid; }
+.kt-n{ font-family:'Fraunces',serif; font-size:44px; font-weight:800; line-height:1; margin-bottom:16px; }
+.kt-h{ font-family:'Fraunces',serif; font-size:21px; font-weight:700; margin-bottom:12px; }
+.kt-d{ font-size:14px; color:var(--ink-dim); line-height:1.7; }
+
+/* === Legend / nav === */
+.legend{ display:flex; gap:16px; flex-wrap:wrap; padding:16px 24px; background:rgba(255,255,255,0.02); border:1px solid var(--card-border); border-radius:4px; margin-bottom:32px; font-family:'JetBrains Mono',monospace; font-size:12px; }
+.legend-item{ display:flex; gap:8px; align-items:center; }
+.legend-dot{ width:10px; height:10px; border-radius:2px; }
+
+/* === Formula box === */
+.formula{ margin:24px 0; padding:24px 28px; background:rgba(0,0,0,0.3); border:1px solid var(--card-border); border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:14px; line-height:1.9; color:#cbd5e1; }
+.formula .ftitle{ font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:12px; }
+.formula b{ color:var(--ink); font-weight:600; }
+.formula .em{ color:#fde047; }
+
+/* === Footer === */
+.footer{ padding:80px 0 60px; text-align:center; border-top:1px solid var(--card-border); margin-top:80px; }
+.footer .quote{ font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:clamp(20px,3vw,30px); max-width:840px; margin:0 auto 32px; line-height:1.4; color:var(--ink-dim); }
+.footer .sig{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:var(--ink-faint); }
+
+/* === Responsive === */
+@media (max-width:900px){
+  .stage-header{ grid-template-columns:1fr; }
+  .stage-num-big{ font-size:48px; }
+  .stats{ grid-template-columns:repeat(2,1fr); }
+  .two-col, .three-col, .four-col{ grid-template-columns:1fr; }
+  .vs-grid{ grid-template-columns:1fr; gap:16px; }
+  .vs-mid{ padding:8px 0; }
+  .layer{ grid-template-columns:1fr; gap:12px; }
+  .layer .ltool{ text-align:left; }
+  .ledger{ grid-template-columns:1fr; }
+  .query-fan{ grid-template-columns:repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="container">
+    <div class="stage-num">A practitioner's field guide · For BIA students · Built around a real LangGraph research agent</div>
+    <h1 class="display">Evaluating agents,<br><em>honestly.</em></h1>
+    <p class="sub">A language model can write fluently and still be wrong. An agent can pass every prompt-level test and still hallucinate, leak PII, or violate regulation. This is how we measure what actually matters — BLEU, ROUGE, Pass@k, hallucination, faithfulness, the EU AI Act, India's DPDP, and DeepEval as the framework that ties it all together.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="num">4</div><div class="label">Metric families</div></div>
+      <div class="stat"><div class="num">2</div><div class="label">Regulations covered</div></div>
+      <div class="stat"><div class="num">1</div><div class="label">RAG agent under the microscope</div></div>
+      <div class="stat"><div class="num">0</div><div class="label">Silver bullets</div></div>
+    </div>
+  </div>
+  <div class="scroll-hint">scroll to begin ↓</div>
+</section>
+
+<!-- ===== LEGEND ===== -->
+<section class="container" style="padding:32px 32px 0;">
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-bleu)"></span><span><b style="color:var(--c-bleu)">BLEU</b> · precision-flavored lexical</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-rouge)"></span><span><b style="color:var(--c-rouge)">ROUGE</b> · recall-flavored lexical</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-passk)"></span><span><b style="color:var(--c-passk)">Pass@k</b> · k-shot capability</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-halluc)"></span><span><b style="color:var(--c-halluc)">Hallucination</b> · contradiction</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-faith)"></span><span><b style="color:var(--c-faith)">Faithfulness</b> · groundedness</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-eu)"></span><span><b style="color:var(--c-eu)">EU AI Act</b> · risk tiers</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-dpdp)"></span><span><b style="color:var(--c-dpdp)">DPDP</b> · India PII law</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-deepeval)"></span><span><b style="color:var(--c-deepeval)">DeepEval</b> · the framework</span></div>
+  </div>
+</section>
+
+<!-- ===== STAGE 0 — WHY EVAL IS HARD ===== -->
+<section class="stage" style="--stage-color: var(--s1)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">00</div>
+      <div>
+        <h2 class="stage-title">Why agent eval <em>is hard.</em></h2>
+        <p class="stage-kicker">A classifier has one job and one truth: a label is right or wrong. An LLM agent has many right answers, none of them deterministic, produced by a pipeline of agents that each fail differently. You need more than accuracy.</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>Deterministic</b><span>Same input always produces same output. Classical software. LLMs are <i>not</i> this.</span></div>
+        <div class="vterm"><b>Ground truth</b><span>The known-correct answer used to score a model. For free-form prose, it is rarely unique.</span></div>
+        <div class="vterm"><b>Lexical metric</b><span>Scores word overlap. BLEU, ROUGE. Fast, deterministic, blind to meaning.</span></div>
+        <div class="vterm"><b>Semantic metric</b><span>Scores meaning. Uses an LLM judge or embeddings. Slower, fuzzier, understands paraphrase.</span></div>
+        <div class="vterm"><b>Behavioral metric</b><span>Scores what the agent <i>did</i>, not just what it said. Tool calls, routing, completion.</span></div>
+        <div class="vterm"><b>End-to-end vs component eval</b><span>Score only the final answer, or score each node in the graph independently.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">There are three failure modes a single end-to-end accuracy number cannot distinguish, and a real eval suite has to separate them.</p>
+
+    <div class="three-col">
+      <div class="card accent">
+        <h4 style="color:var(--c-bleu)">Wording failure</h4>
+        <p class="prose" style="font-size:14.5px">The answer is correct but phrased differently from the reference. Lexical metrics punish this. Semantic metrics let it through. Knowing which metric is firing matters.</p>
+      </div>
+      <div class="card accent">
+        <h4 style="color:var(--c-halluc)">Truth failure</h4>
+        <p class="prose" style="font-size:14.5px">The answer sounds confident but contradicts its sources or invents facts. Hallucination and faithfulness metrics live here. The most dangerous failure mode for a research agent.</p>
+      </div>
+      <div class="card accent">
+        <h4 style="color:var(--c-eu)">Compliance failure</h4>
+        <p class="prose" style="font-size:14.5px">The answer is correct and grounded but exposes an Aadhaar number, scores a person, or pretends not to be an AI. Regulators care, quality metrics do not.</p>
+      </div>
+    </div>
+
+    <div class="notes" style="margin-top:32px">
+      <div class="note a"><span class="key">THE PRACTITIONER'S TAKE</span>A complete agent evaluation answers four questions, not one. <b>Did it say it well?</b> (lexical) <b>Did it say the truth?</b> (hallucination/faithfulness) <b>Did it do the right thing?</b> (tool/routing) <b>Was it safe to say?</b> (compliance). Most teams measure question one and ship. That's why production agents surprise their owners.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>Agent evaluation is not classifier accuracy with a coat of paint. It is a <b>portfolio of metrics</b> across lexical, semantic, behavioral, and compliance axes — because an agent can fail on any of them while looking fine on the others. The rest of this lesson is that portfolio, one metric at a time.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 1 — BLEU ===== -->
+<section class="stage" style="--stage-color: var(--c-bleu)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">01</div>
+      <div>
+        <h2 class="stage-title">BLEU. <em>Did you add junk?</em></h2>
+        <p class="stage-kicker">The original machine-translation metric, built at IBM in 2002. It scores <em>precision</em> over n-grams — of the words your model produced, how many appear in the reference. Still everywhere, often wrong.</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>BLEU</b><span>Bilingual Evaluation Understudy. Papineni et al., IBM, 2002. Originally for translation.</span></div>
+        <div class="vterm"><b>n-gram</b><span>A run of <i>n</i> consecutive words. "the cat sat" is a 3-gram. BLEU usually averages 1- through 4-grams.</span></div>
+        <div class="vterm"><b>Precision</b><span>Of what you produced, what fraction is correct. Answers "did you add junk?"</span></div>
+        <div class="vterm"><b>Reference (gold)</b><span>The human-written correct answer that the model output is scored against.</span></div>
+        <div class="vterm"><b>Brevity penalty</b><span>A multiplier that punishes outputs shorter than the reference — stops models from gaming precision by writing one word.</span></div>
+        <div class="vterm"><b>Smoothing</b><span>A small fix that prevents BLEU from collapsing to 0 when higher n-grams don't match. Critical for short sentences.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">BLEU asks a single question: <em>of the words my model wrote, how many appear in the reference?</em> Higher is better. The reference is treated as gospel, and anything the model adds outside it is treated as junk.</p>
+
+    <div class="formula">
+      <div class="ftitle">The intuition (not the full formula)</div>
+      <span class="em">BLEU ≈</span> brevity_penalty × <b>geometric_mean</b>( precision_1gram, precision_2gram, precision_3gram, precision_4gram )<br><br>
+      Each precision_n = (n-grams in output that appear in reference) / (total n-grams in output)
+    </div>
+
+    <div class="card accent">
+      <h4>Worked example · the cat sat</h4>
+      <p class="prose" style="margin-top:8px">
+        <b>Reference:</b> <code>the cat sat on the mat</code><br>
+        <b>Model output:</b> <code>the cat sat on a mat</code>
+      </p>
+      <p class="prose">Model words: <code>the · cat · sat · on · a · mat</code> — 6 tokens. Five of them (<code>the · cat · sat · on · mat</code>) appear in the reference. One (<code>a</code>) does not.</p>
+      <p class="prose"><b>Unigram precision = 5/6 ≈ 0.83.</b> A high score, because the model added almost no junk.</p>
+    </div>
+
+    <div class="analogy">
+      <div class="tag">memory hook</div>
+      <p>BLEU is the <em>tight talker</em>. It rewards you for staying inside the reference's vocabulary and punishes you for adding anything outside it. <em>Did you add junk?</em></p>
+    </div>
+
+    <div class="notes" style="margin-top:24px">
+      <div class="note a"><span class="key">WHEN BLEU IS THE RIGHT TOOL</span>Machine translation, structured output, short factual answers, code generation against a canonical reference. Anywhere the <i>exact wording</i> matters.</div>
+      <div class="note w"><span class="key">WHEN BLEU LIES TO YOU</span>Free-form prose, summarization, creative writing, agent answers with multiple valid phrasings. BLEU has no concept of synonyms — "feline" and "cat" mean nothing to it.</div>
+      <div class="note t"><span class="key">SMOOTHING — WHY YOUR CODE NEEDS IT</span>Without smoothing, BLEU returns <b>0</b> the moment any 4-gram fails to match. On short agent answers, 4-gram matches are rare, so unsmoothed BLEU is mostly zero. Your <code>lexical_code.py</code> uses <code>SmoothingFunction().method1</code> — that is the right call.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>BLEU is a <b>precision-over-n-grams</b> metric: of what the model said, how much overlapped the reference. It is fast, deterministic, and brutally literal. Use it for translation and short factual outputs. For your research agent's free-form prose, expect <em>low scores even on correct answers</em> — because BLEU cannot see meaning, only matching words.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 2 — ROUGE ===== -->
+<section class="stage" style="--stage-color: var(--c-rouge)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">02</div>
+      <div>
+        <h2 class="stage-title">ROUGE. <em>Did you miss stuff?</em></h2>
+        <p class="stage-kicker">Built for summarization (Lin, 2004). The mirror image of BLEU — it scores <em>recall</em>. Of the words in the reference, how many did your model capture?</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>ROUGE</b><span>Recall-Oriented Understudy for Gisting Evaluation. Chin-Yew Lin, 2004. Built for summarization.</span></div>
+        <div class="vterm"><b>Recall</b><span>Of the things that should be there, how many are. Answers "did you miss stuff?"</span></div>
+        <div class="vterm"><b>ROUGE-1 / ROUGE-2</b><span>Overlap of single words (unigrams) or word pairs (bigrams) between output and reference.</span></div>
+        <div class="vterm"><b>ROUGE-L</b><span>Longest Common Subsequence. Rewards getting word <i>order</i> roughly right, not just bag-of-words.</span></div>
+        <div class="vterm"><b>F-measure</b><span>Harmonic mean of precision and recall. Balanced single score. Your code uses <code>.fmeasure</code>.</span></div>
+        <div class="vterm"><b>Stemmer</b><span>Strips suffixes so "running" matches "run". Softens the synonym problem a little — but not much.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">If BLEU is the tight talker, ROUGE is the <em>completeness auditor</em>. It does not care how clean your output is — it cares whether everything in the reference made it into your output.</p>
+
+    <div class="vs-grid">
+      <div class="vs-panel bleu">
+        <h4>BLEU</h4>
+        <div class="vsub">Precision · translation</div>
+        <ul>
+          <li>Asks: did you add words that aren't in the reference?</li>
+          <li>Penalizes extras and inventions</li>
+          <li>Built for machine translation</li>
+          <li>Score = how clean is the output</li>
+        </ul>
+      </div>
+      <div class="vs-mid">vs</div>
+      <div class="vs-panel rouge">
+        <h4>ROUGE</h4>
+        <div class="vsub">Recall · summarization</div>
+        <ul>
+          <li>Asks: did you cover everything in the reference?</li>
+          <li>Penalizes missing content</li>
+          <li>Built for text summarization</li>
+          <li>Score = how complete is the output</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card accent" style="margin-top:28px">
+      <h4>Worked example · same reference, opposite lens</h4>
+      <p class="prose" style="margin-top:8px">
+        <b>Reference:</b> <code>the cat sat on the mat</code> (6 words)<br>
+        <b>Model output:</b> <code>the cat sat on a mat</code>
+      </p>
+      <p class="prose">Reference words the model captured: <code>the · cat · sat · on · mat</code> — 5 of 6. Missed one instance of "the".</p>
+      <p class="prose"><b>Recall = 5/6 ≈ 0.83.</b> Same high score as BLEU here — because the two sentences are nearly identical. The difference shows up only when wording diverges.</p>
+    </div>
+
+    <div class="analogy">
+      <div class="tag">memory hook</div>
+      <p>BLEU asks <em>did you add junk?</em> ROUGE asks <em>did you miss stuff?</em> Same overlap, opposite question.</p>
+    </div>
+
+    <div class="notes" style="margin-top:24px">
+      <div class="note a"><span class="key">YOUR CODE USES ROUGE-L</span><code>lexical_code.py</code> uses <code>rougeL</code> with <code>use_stemmer=True</code>. ROUGE-L matches the longest common word sequence — so "the cat sat on the mat" vs "the cat is on the mat" gets credit for the partial sequence, not just unordered overlap. The stemmer is a nice softener.</div>
+      <div class="note t"><span class="key">PRECISION + RECALL = F-MEASURE</span>Pure recall lets a model game the metric by dumping in everything. So ROUGE in practice reports <b>F-measure</b> — the harmonic mean of precision and recall — which is what your <code>.fmeasure</code> call extracts.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>ROUGE is <b>recall-over-n-grams</b>: of what the reference said, how much did the model capture. ROUGE-L specifically rewards correct word order via the longest common subsequence. Use it for summarization and any task where <em>coverage</em> matters more than terseness. Like BLEU, it sees words, not meaning — which sets up the lexical trap on the next page.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 3 — THE LEXICAL TRAP ===== -->
+<section class="stage" style="--stage-color: var(--s4)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">03</div>
+      <div>
+        <h2 class="stage-title">The lexical trap. <em>Both metrics fail the same way.</em></h2>
+        <p class="stage-kicker">BLEU and ROUGE share a blind spot. They count words. They do not understand them. The moment your model paraphrases — which is exactly what a good research agent <em>should</em> do — both scores collapse.</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>Synonym blindness</b><span>The inability of lexical metrics to recognize that "cat" and "feline" mean the same thing.</span></div>
+        <div class="vterm"><b>Paraphrase</b><span>Same meaning, different words. The natural output of any capable LLM.</span></div>
+        <div class="vterm"><b>Reference dependence</b><span>The metric's quality is bounded by the quality and breadth of your reference. One canned reference, one wording allowed.</span></div>
+        <div class="vterm"><b>Semantic metric</b><span>Metric that uses meaning, not strings. LLM-as-judge (G-Eval), embedding similarity, faithfulness. The fix for the lexical trap.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">Here is the worked example that turns the lesson into a slide. Same meaning, different words. Watch what BLEU and ROUGE do.</p>
+
+    <div class="card accent">
+      <h4>Same meaning. Different words. Watch the scores collapse.</h4>
+      <p class="prose" style="margin-top:8px">
+        <b>Reference:</b> <code>the feline rested on the rug</code><br>
+        <b>Model output:</b> <code>the cat sat on the mat</code>
+      </p>
+      <p class="prose">Any human reader says: identical meaning, perfectly correct answer. But the only words that match are function words — <code>the · on · the</code>. The content words (feline/cat, rested/sat, rug/mat) all differ.</p>
+      <div class="two-col" style="margin-top:20px">
+        <div style="padding:18px 22px; background:rgba(167,139,250,0.08); border-radius:6px; border:1px solid rgba(167,139,250,0.3)">
+          <div class="label" style="color:var(--c-bleu); margin-bottom:6px">BLEU score</div>
+          <div style="font-family:'Fraunces',serif; font-size:38px; font-weight:800; color:var(--c-bleu)">≈ 0.30</div>
+          <div class="prose" style="font-size:13.5px; margin-top:4px">Terrible — for a correct answer.</div>
+        </div>
+        <div style="padding:18px 22px; background:rgba(244,114,182,0.08); border-radius:6px; border:1px solid rgba(244,114,182,0.3)">
+          <div class="label" style="color:var(--c-rouge); margin-bottom:6px">ROUGE-L score</div>
+          <div style="font-family:'Fraunces',serif; font-size:38px; font-weight:800; color:var(--c-rouge)">≈ 0.30</div>
+          <div class="prose" style="font-size:13.5px; margin-top:4px">Same trap, same number.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes" style="margin-top:28px">
+      <div class="note d"><span class="key">THE FAILURE MODE FOR YOUR AGENT</span>Your research agent does <i>live web search</i>. It pulls current phrasing, structures answers its own way, adds context. Against a single canned <code>expected_output</code> reference, BLEU and ROUGE will score low <i>even when the agent answer is better than the reference</i>. That's not a bug. That's the metric's nature.</div>
+      <div class="note g"><span class="key">THE FIX — SEMANTIC METRICS</span>This is why DeepEval ships LLM-as-judge metrics: <b>G-Eval</b>, <b>Faithfulness</b>, <b>Answer Relevancy</b>. They run an LLM over the output and reference to compare <i>meaning</i> instead of words. They cost more (judge LLM calls) but understand paraphrase. Run BLEU/ROUGE alongside them, never alone.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>BLEU and ROUGE share a fatal weakness: <b>they reward word overlap, not meaning</b>. A correct paraphrase scores as low as a wrong answer. For free-form agent output they are necessary but never sufficient — you pair them with semantic metrics that understand language. Teach the contrast, never hide it.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 4 — PASS@K ===== -->
+<section class="stage" style="--stage-color: var(--c-passk)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">04</div>
+      <div>
+        <h2 class="stage-title">Pass@k. <em>Capability under a budget.</em></h2>
+        <p class="stage-kicker">From the OpenAI Codex / HumanEval paper, 2021. Originally for code generation: given <em>k</em> attempts, did <em>at least one</em> work? The right way to measure non-deterministic generation — and the right way to justify a multi-query retrieval node.</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>Pass@k</b><span>Probability that at least one of <i>k</i> independent samples passes the verifier. Single number per benchmark.</span></div>
+        <div class="vterm"><b>Verifier / oracle</b><span>The thing that says pass/fail per sample. Unit tests for code. Gold-chunk match for retrieval. Without it, no pass@k.</span></div>
+        <div class="vterm"><b>Independent sample</b><span>An attempt drawn from the model without conditioning on previous attempts. Critical: sequential retries are <i>not</i> independent.</span></div>
+        <div class="vterm"><b>Best-of-k (inference technique)</b><span>Generate <i>k</i> at runtime, pick a winner. Shares pass@k's shape — but is a <i>technique</i>, not the metric.</span></div>
+        <div class="vterm"><b>Gold chunk</b><span>The pre-labeled correct chunk in your vector store for a given test question. The verifier for RAG pass@k.</span></div>
+        <div class="vterm"><b>Capability vs reliability</b><span>The gap between pass@1 and pass@k tells you which one your model lacks.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">Pass@k answers one question: <em>if I let the model try k times, how often does it get it right at least once?</em> It is a <b>ruler</b>, not a tool. It scores capability under a fixed budget.</p>
+
+    <div class="formula">
+      <div class="ftitle">The estimator (unbiased version)</div>
+      pass@k = <b>1 − C(n−c, k) / C(n, k)</b><br><br>
+      where <span class="em">n</span> = total samples generated, <span class="em">c</span> = number that passed, <span class="em">k</span> = the budget you care about.<br><br>
+      In words: <i>one minus the probability that all k randomly drawn samples come from the failing pile.</i>
+    </div>
+
+    <div class="card accent">
+      <h4>Pass@k is one number, not a range.</h4>
+      <p class="prose" style="margin-top:8px">A common mistake: thinking pass@k changes per question. It does not. <b>You pick k upfront</b> ("I'll let the model try 5 times") and run that fixed budget across every question in your benchmark. The result is one percentage. The only reason to compute pass@1, pass@5, pass@10 side by side is to draw a <em>curve</em> showing how much retrying helps.</p>
+    </div>
+
+    <div class="analogy">
+      <div class="tag">the key distinction</div>
+      <p>Pass@k is the <em>ruler</em> — an evaluation metric. The <em>tool</em> that shares its shape is <em>best-of-k sampling</em> — an inference technique. The difference: evaluation gets an oracle to pick the winner for free. Production has to <em>build</em> one.</p>
+    </div>
+
+    <h3 class="serif" style="font-size:28px; font-weight:700; margin-top:60px; margin-bottom:8px">Pass@k on your multi-query RAG node.</h3>
+    <p class="prose" style="margin-bottom:24px">Your LangGraph generates <b>5 query variants</b> per user question, runs each through retrieval, and pools results. That is structurally <em>parallel, independent sampling with a hard verifier</em> — textbook pass@k territory. Verifier: "did the gold chunk show up?" Below: one worked question.</p>
+
+    <div class="card" style="background:rgba(20,184,166,0.03); border-color:rgba(20,184,166,0.25)">
+      <p class="prose" style="margin-bottom:8px"><b>Question:</b> "What is Python used for?"</p>
+      <p class="prose" style="margin-bottom:0"><b>Gold chunk:</b> <code>#42</code> (the chunk in your vector DB that actually contains the answer)</p>
+
+      <div class="query-fan">
+        <div class="qcol pass">
+          <div class="qn">Q1</div>
+          <div class="qtxt">"What is Python used for?"</div>
+          <div class="qchunks">
+            <div class="qch gold">#42</div>
+            <div class="qch">#17</div>
+            <div class="qch">#88</div>
+          </div>
+          <div class="qhit" style="color:var(--c-good)">✓</div>
+        </div>
+        <div class="qcol fail">
+          <div class="qn">Q2</div>
+          <div class="qtxt">"Python programming applications"</div>
+          <div class="qchunks">
+            <div class="qch">#17</div>
+            <div class="qch">#88</div>
+            <div class="qch">#51</div>
+          </div>
+          <div class="qhit" style="color:var(--c-bad)">✗</div>
+        </div>
+        <div class="qcol pass">
+          <div class="qn">Q3</div>
+          <div class="qtxt">"Use cases of Python language"</div>
+          <div class="qchunks">
+            <div class="qch gold">#42</div>
+            <div class="qch">#51</div>
+            <div class="qch">#09</div>
+          </div>
+          <div class="qhit" style="color:var(--c-good)">✓</div>
+        </div>
+        <div class="qcol fail">
+          <div class="qn">Q4</div>
+          <div class="qtxt">"Why do people use Python"</div>
+          <div class="qchunks">
+            <div class="qch">#88</div>
+            <div class="qch">#09</div>
+            <div class="qch">#33</div>
+          </div>
+          <div class="qhit" style="color:var(--c-bad)">✗</div>
+        </div>
+        <div class="qcol pass">
+          <div class="qn">Q5</div>
+          <div class="qtxt">"Python in data science and web"</div>
+          <div class="qchunks">
+            <div class="qch gold">#42</div>
+            <div class="qch">#33</div>
+            <div class="qch">#17</div>
+          </div>
+          <div class="qhit" style="color:var(--c-good)">✓</div>
+        </div>
+      </div>
+
+      <p class="prose" style="margin-top:8px; font-size:15px"><b>Verdict for this question:</b> at least one of the 5 queries (Q1, Q3, Q5) surfaced gold chunk #42. → <b style="color:var(--c-good)">PASS at k=5.</b></p>
+    </div>
+
+    <p class="prose" style="margin-top:24px">Now repeat across a labeled test set of, say, 20 questions, each with a known gold chunk. Suppose 17 of 20 pass under multi-query, but only 12 of 20 pass when you use just the original user query alone.</p>
+
+    <div class="two-col" style="margin-top:8px">
+      <div style="padding:24px; background:rgba(255,255,255,0.04); border:1px solid var(--card-border); border-radius:6px">
+        <div class="label">Single original query</div>
+        <div style="font-family:'Fraunces',serif; font-size:46px; font-weight:800; color:var(--ink); margin-top:6px">pass@1 = 0.60</div>
+      </div>
+      <div style="padding:24px; background:rgba(20,184,166,0.08); border:1px solid rgba(20,184,166,0.35); border-radius:6px">
+        <div class="label" style="color:var(--c-passk)">Multi-query expansion · k=5</div>
+        <div style="font-family:'Fraunces',serif; font-size:46px; font-weight:800; color:var(--c-passk); margin-top:6px">pass@5 = 0.85</div>
+      </div>
+    </div>
+
+    <div class="notes" style="margin-top:24px">
+      <div class="note r"><span class="key">THE JUMP IS THE JUSTIFICATION</span><b>+25 points of retrieval recall from generating 5 variants.</b> That gap is the entire argument for your multi-query node existing. Without measuring it, the architecture is faith-based. With it, you have a number defensible in a design review.</div>
+      <div class="note w"><span class="key">WHY IT DOESN'T FIT YOUR WRITER-CRITIC LOOP</span>Pass@k needs <i>parallel, independent</i> samples with an <i>oracle verifier</i>. Your Writer-Critic loop is sequential (each draft conditioned on previous critique), dependent, and uses a soft LLM Critic, not an oracle. Plus you ship the <i>last</i> draft, not the <i>best</i> of k. For the loop, the right metric is <b>iterations-to-acceptance</b>, not pass@k.</div>
+      <div class="note t"><span class="key">THE GOLD-LABEL COST</span>Pass@k is not free. You need a small benchmark — 15 to 20 questions — each tagged with its correct chunk ID in your vector store. Build it once, run it forever. Synthetic option: pick a chunk, ask an LLM to write a question that chunk would answer. Now you know the gold.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>Pass@k is the metric for <b>parallel, independent attempts against a hard verifier</b>. It does not fit sequential refinement loops — those need iterations-to-acceptance instead. Its perfect home in your project is the <em>multi-query RAG node</em>, where comparing pass@1 to pass@5 quantifies the value of query expansion in one number. <b>The gap between pass@1 and pass@k is the architectural proof.</b></p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 5 — RETRIEVAL TRIO ===== -->
+<section class="stage" style="--stage-color: var(--s5)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">05</div>
+      <div>
+        <h2 class="stage-title">The retrieval trio. <em>Depth vs breadth.</em></h2>
+        <p class="stage-kicker">Three retrieval metrics, three different questions. Precision and Recall zoom <em>into</em> one query. Pass@k zooms <em>out across</em> many. Together they tell the full story.</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>Context Precision</b><span>Of the chunks I returned, how many are actually relevant? Measures cleanliness.</span></div>
+        <div class="vterm"><b>Context Recall</b><span>Of the relevant chunks that exist, how many did I find? Measures coverage.</span></div>
+        <div class="vterm"><b>Pass@k</b><span>Across k query attempts, did any succeed? Measures the value of trying multiple times.</span></div>
+        <div class="vterm"><b>F1</b><span>Harmonic mean of precision and recall. Single balanced score.</span></div>
+        <div class="vterm"><b>RAGAS</b><span>Popular framework that ships Context Precision and Context Recall out of the box. Uses LLM-as-judge.</span></div>
+        <div class="vterm"><b>MRR / NDCG</b><span>Position-aware retrieval metrics — reward putting the right chunk near the top, not just in the result set.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">Setup for the example below: question has <em>4 gold chunks</em>. Retrieval returns <em>5 chunks</em>. Of those 5, <em>3</em> are actually gold, 2 are junk.</p>
+
+    <table class="dtable">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Question it answers</th>
+          <th>Formula</th>
+          <th>This example</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="k" style="color:var(--c-faith)">Recall</td>
+          <td>How many of the right chunks did I find?</td>
+          <td>gold found / total gold</td>
+          <td><b>3 / 4 = 0.75</b></td>
+        </tr>
+        <tr>
+          <td class="k" style="color:var(--c-halluc)">Precision</td>
+          <td>Of what I returned, how much is right?</td>
+          <td>gold found / total returned</td>
+          <td><b>3 / 5 = 0.60</b></td>
+        </tr>
+        <tr>
+          <td class="k" style="color:var(--c-passk)">Pass@k</td>
+          <td>Did <i>any</i> of my k query attempts hit a gold?</td>
+          <td>binary per question, averaged across set</td>
+          <td><b>0 or 1 per Q</b></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="notes" style="margin-top:32px">
+      <div class="note a"><span class="key">PRECISION AND RECALL TRADE OFF</span>Return only the top-1 chunk and it's gold? Precision = 1.0, recall might be 0.25. Return all 1000 chunks in your DB? Recall = 1.0, precision tanks. Always report <b>both</b>, or combine them as F1.</div>
+      <div class="note r"><span class="key">PASS@K IS A DIFFERENT AXIS</span>Precision and recall measure the <i>quality</i> of one retrieval call. Pass@k measures the <i>value of trying again</i>. Same retriever, k=1 vs k=5, lets you isolate whether multi-query expansion is earning its keep.</div>
+      <div class="note t"><span class="key">PASS@K IS OPTIMISTIC</span>It doesn't care which query succeeded or how clean its results were. A query that returns the gold chunk plus 50 garbage chunks still "passes." Pass@k assumes downstream re-ranking or the LLM will pick the gold from noise. Pair it with precision for honest reporting.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p><b>Precision</b> measures cleanliness, <b>Recall</b> measures coverage, <b>Pass@k</b> measures the breadth of trying multiple queries. Report all three when defending a RAG design. None alone is enough: a system with high recall but low precision wastes tokens; one with high precision but low pass@k cannot exploit query diversity. The trio is the honest answer.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 6 — HALLUCINATION + FAITHFULNESS ===== -->
+<section class="stage" style="--stage-color: var(--c-halluc)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">06</div>
+      <div>
+        <h2 class="stage-title">Hallucination &amp; faithfulness. <em>Did it lie. Did it stay grounded.</em></h2>
+        <p class="stage-kicker">The two semantic metrics that matter most for a research agent. Both LLM-as-judge. Both in your <code>hallucination.py</code>. They sound similar — and DeepEval keeps them separate <em>on purpose.</em></p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>Hallucination</b><span>Output contains statements that <i>contradict</i> the provided context. Lower score = better. Threshold is a <b>maximum.</b></span></div>
+        <div class="vterm"><b>Faithfulness</b><span>Output's claims are all <i>supported by</i> the retrieval context. Higher score = better. Threshold is a <b>minimum.</b></span></div>
+        <div class="vterm"><b>Claim decomposition</b><span>The judge LLM breaks the output into atomic factual statements, then scores each.</span></div>
+        <div class="vterm"><b>Context (ground truth)</b><span>What HallucinationMetric treats as truth. Ideally a curated gold context, not just retrieved snippets.</span></div>
+        <div class="vterm"><b>Retrieval context</b><span>What FaithfulnessMetric checks against — the actual chunks your RAG pulled. Different concept from <code>context</code>.</span></div>
+        <div class="vterm"><b>LLM-as-judge</b><span>The validation engine for both. A separate LLM (gpt-4o-mini in your code) reads output + context and scores.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">Same scenario, four different agent outputs. Watch which metric catches which failure.</p>
+
+    <div class="card">
+      <p class="prose"><b>User asks:</b> "When was the Eiffel Tower built?"</p>
+      <p class="prose" style="margin-bottom:0"><b>Retrieved context:</b> <code>"The Eiffel Tower was completed in 1889 in Paris, designed by Gustave Eiffel for the World's Fair."</code></p>
+    </div>
+
+    <div class="case-grid">
+      <div class="case c1">
+        <div class="cnum">Case 01 · Grounded</div>
+        <div class="ctitle">Perfectly faithful</div>
+        <div class="cout">"The Eiffel Tower was completed in 1889."</div>
+        <div class="cscore">
+          <span><span class="lbl">Halluc</span><span class="val good">0.0</span></span>
+          <span><span class="lbl">Faith</span><span class="val good">1.0</span></span>
+        </div>
+      </div>
+      <div class="case c2">
+        <div class="cnum">Case 02 · Contradicts</div>
+        <div class="ctitle">Classic hallucination</div>
+        <div class="cout">"The Eiffel Tower was completed in <b style="color:#fca5a5">1875</b> by Gustave Eiffel."</div>
+        <div class="cscore">
+          <span><span class="lbl">Halluc</span><span class="val bad">0.5</span></span>
+          <span><span class="lbl">Faith</span><span class="val bad">0.5</span></span>
+        </div>
+      </div>
+      <div class="case c3">
+        <div class="cnum">Case 03 · Adds unsupported</div>
+        <div class="ctitle">The silent failure</div>
+        <div class="cout">"The Eiffel Tower was completed in 1889 and is <b style="color:#fcd34d">324 meters tall</b>."</div>
+        <div class="cscore">
+          <span><span class="lbl">Halluc</span><span class="val good">0.0</span></span>
+          <span><span class="lbl">Faith</span><span class="val warn">0.5</span></span>
+        </div>
+      </div>
+      <div class="case c4">
+        <div class="cnum">Case 04 · Paraphrased</div>
+        <div class="ctitle">Different words, same facts</div>
+        <div class="cout">"Gustave Eiffel's tower was finished in 1889 for the World's Fair in Paris."</div>
+        <div class="cscore">
+          <span><span class="lbl">Halluc</span><span class="val good">0.0</span></span>
+          <span><span class="lbl">Faith</span><span class="val good">1.0</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes" style="margin-top:28px">
+      <div class="note w"><span class="key">CASE 03 IS THE KILLER</span>The agent added a true-sounding fact (the height actually is 324m) — but it's not from the source. <b>Hallucination misses it</b> (no contradiction). <b>Faithfulness catches it</b> (not supported). This is exactly why DeepEval keeps the two metrics separate. The dangerous failure mode in a research agent is not lying — it's <i>confidently sneaking in details the sources never mentioned.</i></div>
+      <div class="note g"><span class="key">PARAPHRASE PASSES BOTH</span>Case 04 reorders and rephrases — and both metrics give it full marks. That is the contrast with BLEU/ROUGE: those would have tanked the same output. Semantic metrics see meaning, lexical metrics see strings.</div>
+    </div>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-top:56px; margin-bottom:8px">The threshold asymmetry — easy to get wrong.</h3>
+    <div class="vs-grid">
+      <div class="vs-panel halluc">
+        <h4>Hallucination</h4>
+        <div class="vsub">Lower is better · max threshold</div>
+        <ul>
+          <li>Score is the fraction of contexts the output contradicts</li>
+          <li>0.0 = perfectly clean; 1.0 = contradicts everything</li>
+          <li>Threshold is a <b>ceiling</b> — passes if score ≤ threshold</li>
+          <li>Your code: <code>threshold=0.3</code> — at most 30% contradiction allowed</li>
+        </ul>
+      </div>
+      <div class="vs-mid">vs</div>
+      <div class="vs-panel faith">
+        <h4>Faithfulness</h4>
+        <div class="vsub">Higher is better · min threshold</div>
+        <ul>
+          <li>Score is the fraction of claims supported by retrieval context</li>
+          <li>1.0 = every claim grounded; 0.0 = nothing supported</li>
+          <li>Threshold is a <b>floor</b> — passes if score ≥ threshold</li>
+          <li>Your code: <code>threshold=0.6</code> — lenient; 0.8 is the production bar</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-top:56px; margin-bottom:8px">How validation actually happens — the judge mechanism.</h3>
+    <ol style="list-style:none; counter-reset:vstep; max-width:880px">
+      <li style="counter-increment:vstep; position:relative; padding-left:48px; margin-bottom:18px;">
+        <span style="position:absolute; left:0; top:-4px; font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:32px; color:var(--c-halluc);">1.</span>
+        <div class="prose" style="margin:0"><b>Your agent produces a final answer.</b> Searcher fetches snippets, Writer drafts prose. Final state has <code>answer</code>, <code>sources</code>, <code>facts</code>.</div>
+      </li>
+      <li style="counter-increment:vstep; position:relative; padding-left:48px; margin-bottom:18px;">
+        <span style="position:absolute; left:0; top:-4px; font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:32px; color:var(--c-halluc);">2.</span>
+        <div class="prose" style="margin:0"><b>Harness builds <code>retrieved_contexts</code></b> — concatenates source snippets + extracted facts into one list. This list becomes the "ground truth" the judge will check against.</div>
+      </li>
+      <li style="counter-increment:vstep; position:relative; padding-left:48px; margin-bottom:18px;">
+        <span style="position:absolute; left:0; top:-4px; font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:32px; color:var(--c-halluc);">3.</span>
+        <div class="prose" style="margin:0"><b>DeepEval spins up a separate LLM (gpt-4o-mini)</b> — the judge. This is not your agent. It is an independent model whose only job is to grade.</div>
+      </li>
+      <li style="counter-increment:vstep; position:relative; padding-left:48px; margin-bottom:18px;">
+        <span style="position:absolute; left:0; top:-4px; font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:32px; color:var(--c-halluc);">4.</span>
+        <div class="prose" style="margin:0"><b>The judge decomposes the agent's answer into atomic claims.</b> For each claim it asks: supported by context? contradicted? absent?</div>
+      </li>
+      <li style="counter-increment:vstep; position:relative; padding-left:48px; margin-bottom:18px;">
+        <span style="position:absolute; left:0; top:-4px; font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:32px; color:var(--c-halluc);">5.</span>
+        <div class="prose" style="margin:0"><b>Tally produces both scores plus a natural-language reason.</b> Hallucination = contradicted/total contexts. Faithfulness = supported/total claims. The <code>.reason</code> string explains which claims failed — that's what shows up in your report.</div>
+      </li>
+    </ol>
+
+    <div class="notes" style="margin-top:24px">
+      <div class="note d"><span class="key">THE CRITICAL CAVEAT</span>The judge trusts <code>retrieved_contexts</code> as ground truth. If your Searcher pulled bad sources, your "truth" is wrong — and a perfectly faithful answer to wrong sources scores high while being factually false. <b>Faithfulness measures consistency with sources, not consistency with reality.</b> Say this out loud in class.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p><b>Hallucination catches lies. Faithfulness also catches sneaking in.</b> Hallucination flags contradictions; faithfulness flags unsupported additions. For a RAG agent, faithfulness is the load-bearing metric — the agent's dangerous failure mode is rarely outright fabrication, it's confident embellishment. Both use an LLM judge that decomposes the answer into claims. Both measure consistency with retrieved sources, not with reality — a limit you must own.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 7 — EU AI ACT ===== -->
+<section class="stage" style="--stage-color: var(--c-eu)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">07</div>
+      <div>
+        <h2 class="stage-title">EU AI Act. <em>The four risk tiers.</em></h2>
+        <p class="stage-kicker">Passed 2024, phased into force through 2026-27. The first comprehensive AI law in the world. Regulates AI not by technology but by <em>use case</em>. The same LLM is fine for grammar checking and forbidden for citizen scoring.</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>Risk tier</b><span>The Act sorts every AI system into one of four buckets based on potential harm to people.</span></div>
+        <div class="vterm"><b>Prohibited practice</b><span>Tier-1: outright banned, regardless of safeguards. Social scoring, subliminal manipulation, biometric mass surveillance.</span></div>
+        <div class="vterm"><b>High-risk system</b><span>Tier-2: allowed but heavily regulated. Mandatory audits, logs, human oversight, conformity assessment.</span></div>
+        <div class="vterm"><b>Transparency obligation</b><span>Tier-3: must tell users they're interacting with AI, must label AI-generated media.</span></div>
+        <div class="vterm"><b>Extraterritorial reach</b><span>The Act applies to any AI system whose output reaches EU users — regardless of where the company is based.</span></div>
+        <div class="vterm"><b>Conformity assessment</b><span>Pre-deployment audit for high-risk systems. Documentation, risk management, data governance.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">Risk tier follows the <em>use case</em>, not the <em>technology</em>. The same model is minimal-risk as a grammar checker and high-risk as a resume screener. Students miss this constantly.</p>
+
+    <div class="tier-grid">
+      <div class="tier t1">
+        <h5>Unacceptable</h5>
+        <div class="tsub">Banned outright</div>
+        <ul>
+          <li><b>Social scoring</b> — government rates citizens on behavior, social media, friendships; restricts services based on the score</li>
+          <li><b>Subliminal manipulation</b> — betting app flashes imperceptible cues to nudge problem gamblers into larger bets</li>
+          <li><b>Workplace emotion recognition</b> — call center uses webcam AI to detect agent frustration in real time, auto-penalizes performance</li>
+        </ul>
+      </div>
+      <div class="tier t2">
+        <h5>High risk</h5>
+        <div class="tsub">Allowed with audit</div>
+        <ul>
+          <li><b>Resume screening AI</b> — filters job applicants for a bank; must be audited for bias, decisions logged, rejected candidates have appeal rights</li>
+          <li><b>Credit scoring</b> — approves/denies loans; must be explainable, audited for discrimination, human review available</li>
+          <li><b>AI radiology assistant</b> — flags tumors in CT scans; medical device rules apply, clinical validation, doctor signs off final diagnosis</li>
+        </ul>
+      </div>
+      <div class="tier t3">
+        <h5>Limited risk</h5>
+        <div class="tsub">Transparency only</div>
+        <ul>
+          <li><b>Customer support chatbot</b> — telecom's WhatsApp bot must clearly say "you're chatting with an AI assistant," not pretend to be a human agent</li>
+          <li><b>Deepfake in advertising</b> — AI-generated celebrity footage (with permission) must be visibly labeled as AI-generated</li>
+          <li><b>AI-written news</b> — news site publishing LLM-summarized articles must disclose "generated with AI assistance" to readers</li>
+        </ul>
+      </div>
+      <div class="tier t4">
+        <h5>Minimal risk</h5>
+        <div class="tsub">No obligations</div>
+        <ul>
+          <li><b>Spam filter</b> in email — classifies messages as junk, no disclosure or audit needed</li>
+          <li><b>NPC behavior in a video game</b> — AI enemies deciding when to take cover, pure entertainment</li>
+          <li><b>Grammar checker</b> underlining typos as you type — minor productivity tool, free to operate</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="notes" style="margin-top:32px">
+      <div class="note a"><span class="key">EXTRATERRITORIAL — WHY IT MATTERS IN BANGALORE</span>The Act binds anyone whose AI output reaches an EU user. Indian SaaS selling to a German bank? Must comply. US startup with EU users? Must comply. Your research agent, if deployed for EU users, would need to <b>disclose "I'm an AI"</b> under the limited-risk tier. This is the same extraterritorial reach as GDPR. Global teams at Globant care because their clients are everywhere.</div>
+      <div class="note t"><span class="key">YOUR AGENT'S TIER</span>A research/Q&amp;A agent is typically <b>minimal or limited risk</b>. Stay there. Don't let scope creep push you into high-risk territory (hiring, credit, medical) without the compliance budget that comes with it.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>The EU AI Act sorts systems by <b>use-case risk</b>, not technology. Four tiers: <em>unacceptable</em> (banned), <em>high</em> (audited), <em>limited</em> (transparency), <em>minimal</em> (free). Same model, different deployment, different tier. The reach is global — anyone serving EU users is in scope. Your research agent is likely limited-risk and must say "I'm an AI" at minimum.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 8 — DPDP ===== -->
+<section class="stage" style="--stage-color: var(--c-dpdp)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">08</div>
+      <div>
+        <h2 class="stage-title">DPDP Act. <em>India's data law.</em></h2>
+        <p class="stage-kicker">Digital Personal Data Protection Act, 2023. India's equivalent of GDPR. For LLM agents, the practical concern is one thing: <em>do not let PII leak in the output.</em></p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>DPDP Act</b><span>Digital Personal Data Protection Act, 2023. India's framework for personal data handling.</span></div>
+        <div class="vterm"><b>Data Principal</b><span>The individual whose personal data is being processed. The user. Has rights.</span></div>
+        <div class="vterm"><b>Data Fiduciary</b><span>The entity processing personal data. Has duties. (Your company.)</span></div>
+        <div class="vterm"><b>Consent</b><span>Must be free, specific, informed, unconditional, unambiguous. No more buried checkboxes.</span></div>
+        <div class="vterm"><b>Purpose limitation</b><span>You may only use the data for the stated purpose. Reuse for something else needs fresh consent.</span></div>
+        <div class="vterm"><b>Right to erasure</b><span>The user can demand deletion. You must comply and stop processing.</span></div>
+        <div class="vterm"><b>PII identifier</b><span>Aadhaar (12-digit), PAN (5-letter + 4-digit + 1-letter), voter ID, passport, +91 phone numbers.</span></div>
+        <div class="vterm"><b>Penalty</b><span>Up to ₹250 crore per violation. Real teeth, not advisory.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">DPDP gives four rights to every user — <em>access, correction, erasure, grievance</em> — and one big rule to every company: collect with consent, use for the stated purpose, delete when done.</p>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-top:32px; margin-bottom:12px">Three concrete DPDP violations.</h3>
+    <div class="three-col">
+      <div class="card accent" style="border-left-color:var(--c-dpdp)">
+        <div class="label" style="color:var(--c-dpdp); margin-bottom:8px">Violation 01</div>
+        <h4>The Aadhaar leak</h4>
+        <p class="prose" style="font-size:14.5px">Your research agent answers <i>"tell me about Ramesh Kumar"</i> and outputs <code>"Ramesh Kumar, Aadhaar 1234-5678-9012, lives in Bangalore."</code> A 12-digit Aadhaar in plain text. Instant DPDP breach.</p>
+      </div>
+      <div class="card accent" style="border-left-color:var(--c-dpdp)">
+        <div class="label" style="color:var(--c-dpdp); margin-bottom:8px">Violation 02</div>
+        <h4>Unauthorized sharing</h4>
+        <p class="prose" style="font-size:14.5px">A customer support bot logs the user's full PAN (<code>ABCDE1234F</code>) into a third-party analytics tool without consent. The data leaves the consented purpose. DPDP cares.</p>
+      </div>
+      <div class="card accent" style="border-left-color:var(--c-dpdp)">
+        <div class="label" style="color:var(--c-dpdp); margin-bottom:8px">Violation 03</div>
+        <h4>No erasure</h4>
+        <p class="prose" style="font-size:14.5px">An AI app stores users' phone numbers indefinitely after they've deleted their accounts. Right to erasure violated. Fines follow.</p>
+      </div>
+    </div>
+
+    <div class="notes" style="margin-top:32px">
+      <div class="note a"><span class="key">FOR YOUR AGENT — THE NARROW DPDP SLICE</span>You don't need to implement the whole DPDP framework in your evaluation suite. You need to check <b>one thing</b>: does the LLM emit PII in its outputs. That's the audit your <code>compliance.py</code> runs — a G-Eval judge reading the output for unredacted Aadhaar, PAN, voter ID, and phone-number patterns, and scoring against the DPDP rule set.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>DPDP is India's PII law: consent-based collection, purpose limitation, four user rights, ₹250 crore fines. For an LLM agent, the operational concern narrows to <b>preventing PII leakage in outputs</b> — and that's exactly what your <code>compliance.py</code> audit checks against the DPDP rule set, scoring every agent answer for unredacted Aadhaar, PAN, voter ID, and phone-number patterns.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 9 — COMPLIANCE LAYERS ===== -->
+<section class="stage" style="--stage-color: var(--c-guard)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">09</div>
+      <div>
+        <h2 class="stage-title">Compliance. <em>Prevention vs detection.</em></h2>
+        <p class="stage-kicker">There are three places compliance can live in an agent stack. Your <code>compliance.py</code> only occupies one of them — and not the one that prevents harm. Knowing the difference is the difference between an audit and an airbag.</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>System prompt</b><span>Instructions inside the agent telling it the rules. Soft, may leak anyway. Layer 1.</span></div>
+        <div class="vterm"><b>Guardrails</b><span>External tools that block or rewrite outputs in real time. NeMo Guardrails, Guardrails AI, regex filters. Layer 2.</span></div>
+        <div class="vterm"><b>Evaluation / audit</b><span>Post-hoc judge that scores outputs for compliance. Detects, does not prevent. Layer 3. <b>This is what your code is.</b></span></div>
+        <div class="vterm"><b>Preventive vs detective</b><span>Preventive stops the bad output. Detective catches it after the fact. Both have a role; only the first protects the user.</span></div>
+        <div class="vterm"><b>Theatrical compliance</b><span>Compliance setup that looks rigorous on slides but doesn't actually stop violations. The trap to avoid.</span></div>
+        <div class="vterm"><b>Defense in depth</b><span>Layering all three so that what slips past one layer is caught by the next.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">Three layers. Three jobs. Three different tools. Your evaluation suite is the third — useful, but never the only line of defense.</p>
+
+    <div class="layer-stack">
+      <div class="layer prev">
+        <div class="lwhere">Layer 1<br>Inside the agent</div>
+        <div>
+          <div class="lname">System prompt</div>
+          <div class="ldesc"><b>Preventive.</b> You tell your own LLM upfront: "never output Aadhaar, never do social scoring, always say you're an AI." Stops bad output at generation time. Soft — the model can still leak under adversarial pressure.</div>
+        </div>
+        <div class="ltool"><b>Tool</b>System prompt instructions<br>Few-shot examples</div>
+      </div>
+      <div class="layer guard">
+        <div class="lwhere">Layer 2<br>Wraps the agent</div>
+        <div>
+          <div class="lname">Guardrails</div>
+          <div class="ldesc"><b>Preventive.</b> External tools that intercept the output before it ships and either block or rewrite. Hard, deterministic. Regex catches Aadhaar patterns 100% of the time. NeMo Guardrails handles topic, jailbreak, output-shape policy.</div>
+        </div>
+        <div class="ltool"><b>Tool</b>Regex / NeMo Guardrails<br>Guardrails AI</div>
+      </div>
+      <div class="layer eval">
+        <div class="lwhere">Layer 3<br>After the agent</div>
+        <div>
+          <div class="lname">Evaluation / audit · this is your compliance.py</div>
+          <div class="ldesc"><b>Detective.</b> A judge LLM grades outputs against compliance criteria. Reports a score. <i>Does not block.</i> Useful for monitoring, regression testing, and dashboards. <b>Cannot stop a violation</b> — only catch that one happened.</div>
+        </div>
+        <div class="ltool"><b>Tool</b>DeepEval G-Eval<br>Confident AI</div>
+      </div>
+    </div>
+
+    <div class="analogy">
+      <div class="tag">the slide-worthy line</div>
+      <p>Your <em>compliance.py</em> is the <em>audit</em>, not the <em>airbag.</em> It tells you the agent crashed — it does not stop the crash. Production needs all three layers. Don't let students think "we ran G-Eval, so we're compliant." You're not compliant — you're <em>measured.</em></p>
+    </div>
+
+    <div class="notes" style="margin-top:24px">
+      <div class="note g"><span class="key">WHEN AUDIT IS THE RIGHT JOB</span>For your <i>evaluation suite</i> — yes, audit is exactly right. The module is literally called <code>agent_evaluation</code>. It's a test harness, not a production safety system. You're checking "would my agent have violated these rules across my test set?" Same logic as unit tests before shipping.</div>
+      <div class="note w"><span class="key">TOOL CHOICE MATTERS — EU AI ACT VS DPDP</span>EU AI Act needs a <i>judge</i> — risk-tier evaluation is semantic, regex can't read intent. G-Eval is the right tool. DPDP needs a <i>regex</i> — Aadhaar/PAN have hard formats, an LLM is overkill. Using the same tool for both is a mistake your students should learn to spot.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>Compliance lives in three places: <b>system prompt</b> (inside), <b>guardrails</b> (around), <b>evaluation</b> (after). The first two prevent; the third detects. Your <code>compliance.py</code> occupies the third — the audit layer — and that is the correct layer for an <em>evaluation suite</em>. It scores every agent run against the EU AI Act and DPDP criteria so you know, before shipping, whether the agent stayed inside the lines.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 10 — DEEPEVAL FRAMEWORK ===== -->
+<section class="stage" style="--stage-color: var(--c-deepeval)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">10</div>
+      <div>
+        <h2 class="stage-title">DeepEval. <em>The framework, in one stage.</em></h2>
+        <p class="stage-kicker">An open-source evaluation framework with 50+ native metrics, an LLM-as-judge engine (G-Eval), a tracing system for component-level evaluation, and a hosted dashboard (Confident AI). Built for testing LLM apps the way pytest tests Python.</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>LLMTestCase</b><span>The basic unit. Wraps <code>input</code>, <code>actual_output</code>, <code>expected_output</code>, <code>context</code>, <code>retrieval_context</code> into one object that every metric consumes.</span></div>
+        <div class="vterm"><b>BaseMetric</b><span>The class you subclass to write a custom metric. Your BLEU and ROUGE classes do exactly this.</span></div>
+        <div class="vterm"><b>G-Eval</b><span>LLM-as-judge metric. You write a plain-English criteria, the judge LLM grades against it. 0-1 continuous score.</span></div>
+        <div class="vterm"><b>@observe()</b><span>Decorator for tracing. Wrap each LangGraph node; DeepEval captures inputs, outputs, and runs per-node metrics.</span></div>
+        <div class="vterm"><b>Span</b><span>A captured node execution in the trace. Each span gets its own metrics. Builds a hierarchical view of the run.</span></div>
+        <div class="vterm"><b>Confident AI</b><span>The hosted dashboard for DeepEval. Free tier covers trace viewing and basic metric reports.</span></div>
+      </div>
+    </div>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-bottom:12px">The native metric catalog — what DeepEval ships out of the box.</h3>
+    <table class="dtable">
+      <thead>
+        <tr><th>Category</th><th>Metric</th><th>What it scores</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="k" style="color:var(--c-passk)">RAG</td><td>Answer Relevancy</td><td>Did the answer address the input? Catches off-topic drift.</td></tr>
+        <tr><td class="k" style="color:var(--c-passk)">RAG</td><td>Faithfulness</td><td>Are claims supported by <code>retrieval_context</code>? In your <code>hallucination.py</code>.</td></tr>
+        <tr><td class="k" style="color:var(--c-passk)">RAG</td><td>Contextual Precision/Recall</td><td>Retriever quality. RAGAS-style. Maps to our stage 5 trio.</td></tr>
+        <tr><td class="k" style="color:var(--c-halluc)">General</td><td>Hallucination</td><td>Output contradicts <code>context</code>. Threshold is max. In your <code>hallucination.py</code>.</td></tr>
+        <tr><td class="k" style="color:var(--c-halluc)">General</td><td>Summarization</td><td>Summary preserves source content and adds nothing false.</td></tr>
+        <tr><td class="k" style="color:var(--c-eu)">Agentic</td><td>Tool Correctness</td><td>Did the agent call the right tool with the right args? <i>Missing from your code.</i></td></tr>
+        <tr><td class="k" style="color:var(--c-eu)">Agentic</td><td>Task Completion</td><td>Did the agent finish what the user asked for end-to-end?</td></tr>
+        <tr><td class="k" style="color:var(--c-dpdp)">Safety</td><td>Bias / Toxicity</td><td>Detects biased or toxic language in output. Pedagogical TODO in your files.</td></tr>
+        <tr><td class="k" style="color:var(--c-guard)">Custom</td><td>G-Eval / DAG</td><td>You write the criteria in plain English. The judge grades. In your <code>compliance.py</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="notes" style="margin-top:24px">
+      <div class="note a"><span class="key">PICK THE METRIC THAT MATCHES THE TASK</span>RAG agents lean on Faithfulness and Contextual Precision/Recall. Pure-LLM Q&amp;A leans on Hallucination and Answer Relevancy. Agentic systems add Tool Correctness and Task Completion. Custom rules and compliance criteria go through G-Eval. The catalog is wide so you can match the metric to the agent shape, not force a generic score across everything.</div>
+    </div>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-top:56px; margin-bottom:12px">G-Eval — the universal escape hatch.</h3>
+    <p class="prose">When no native metric fits, you write G-Eval. Plain-English criteria, an LLM grades against it. This is what your <code>compliance.py</code> uses for EU AI Act and DPDP. Pattern:</p>
+
+    <div class="formula" style="margin-top:8px">
+      <span class="em">name</span> = "EU AI Act Risk Grader"<br>
+      <span class="em">criteria</span> = "Audit input and output for prohibited AI practices... flag as failed (score &lt; 0.8) if the system attempts social scoring, biometric profiling, emotion recognition in workplaces..."<br>
+      <span class="em">evaluation_params</span> = [INPUT, ACTUAL_OUTPUT]<br>
+      <span class="em">threshold</span> = 0.8 &nbsp;·&nbsp; <span class="em">model</span> = "gpt-4o-mini"
+    </div>
+
+    <div class="notes" style="margin-top:8px">
+      <div class="note w"><span class="key">G-EVAL GIVES SOFT SCORES — KNOW THIS</span>The criteria can <i>request</i> a binary 0.0 / 1.0 output, but the judge ignores that and returns a continuous score (0.3, 0.7, 0.9). G-Eval is graded, not categorical. Build your code around that fact.</div>
+    </div>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-top:56px; margin-bottom:12px">Component-level evaluation — <code>@observe()</code>.</h3>
+    <p class="prose">End-to-end scoring tells you the agent failed. <b>Component evaluation tells you which agent failed.</b> Decorate each LangGraph node with <code>@observe()</code>, attach node-specific metrics, get per-span scores.</p>
+
+    <table class="dtable" style="margin-top:8px">
+      <thead><tr><th>Node</th><th>Job</th><th>Right metric to attach</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Multi-query</td><td>Generate k query variants</td><td>Pass@k retrieval recall (custom, our stage 4)</td></tr>
+        <tr><td class="k">Searcher</td><td>Fetch relevant docs</td><td>Contextual Precision + Contextual Recall</td></tr>
+        <tr><td class="k">Reader / Facts</td><td>Pull facts from snippets</td><td>Faithfulness, or custom G-Eval "facts must be verbatim"</td></tr>
+        <tr><td class="k">Writer</td><td>Synthesize prose from facts</td><td>Faithfulness + Hallucination</td></tr>
+        <tr><td class="k">Critic</td><td>Approve/reject drafts</td><td>Custom G-Eval against human-reviewer baseline</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-top:56px; margin-bottom:12px">Eval vs production — separating tracing from scoring.</h3>
+    <p class="prose"><b>Tracing is cheap.</b> Just captures spans, always-on overhead negligible. <b>Metric scoring is expensive</b> — every metric is a judge LLM call. For a 4-node graph with 5 metrics per node, that's 20 extra LLM calls per user request. Leaving this on in production has burned real budgets.</p>
+
+    <p class="prose">The standard pattern: a <em>thin wrapper</em> around <code>@observe()</code> that reads an env var (<code>DEEPEVAL_MODE</code>) and decides what to attach. <code>eval</code> = full scoring. <code>trace</code> = capture spans, no judging. <code>off</code> = decorator becomes a no-op. Write it once, decorate every node with your wrapper, flip the env var per environment.</p>
+
+    <div class="notes" style="margin-top:8px">
+      <div class="note t"><span class="key">DECORATION TIME, NOT RUNTIME</span>The env var must be read when the module is <i>imported</i>, not when the function is <i>called</i>. Decorators bake in at import. Flipping the env mid-process won't change behavior without a restart. For runtime toggling you'd put the gate inside the wrapped function instead.</div>
+    </div>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-top:56px; margin-bottom:12px">DeepEval ≠ LangSmith. Both are needed.</h3>
+    <div class="vs-grid">
+      <div class="vs-panel halluc">
+        <h4>LangSmith</h4>
+        <div class="vsub">Operational telemetry</div>
+        <ul>
+          <li>Latency per node, token counts, cost</li>
+          <li>Full trace tree, replay, debugging</li>
+          <li>Auto-instrumented via env vars; zero per-node code</li>
+          <li>Answers "<i>how did the agent run?</i>"</li>
+        </ul>
+      </div>
+      <div class="vs-mid">+</div>
+      <div class="vs-panel faith">
+        <h4>DeepEval</h4>
+        <div class="vsub">Quality evaluation</div>
+        <ul>
+          <li>Faithfulness, hallucination, tool correctness</li>
+          <li>Compliance via G-Eval</li>
+          <li>LLM-as-judge scoring per metric</li>
+          <li>Answers "<i>how well did the agent run?</i>"</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="notes" style="margin-top:24px">
+      <div class="note a"><span class="key">YOUR STACK IS WHAT PRODUCTION LOOKS LIKE</span>You already have LangSmith for ops. You have DeepEval for quality. That combination — <i>ops telemetry + LLM-judge quality evaluation</i> — is what serious teams ship. You can tell students with a straight face: this isn't a toy stack, this is production grammar.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>DeepEval is the framework that ties every other stage in this lesson together. It ships <b>50+ native metrics</b>, an <b>LLM-as-judge engine (G-Eval)</b> for custom rules, and an <b>@observe() tracing system</b> for per-node evaluation. Tracing is cheap; scoring is expensive — gate scoring behind an env var so dev/eval pays and production doesn't. Pair it with LangSmith: <em>LangSmith for how, DeepEval for how well.</em></p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STAGE 11 — WHAT'S WIRED ===== -->
+<section class="stage" style="--stage-color: var(--s8)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big">11</div>
+      <div>
+        <h2 class="stage-title">The implementation. <em>What's wired in your code.</em></h2>
+        <p class="stage-kicker">Every stage above has a piece in your files. Here's how the metrics, the compliance audit, and the LangGraph wiring come together as one runnable evaluation suite — module by module.</p>
+      </div>
+    </div>
+
+    <div class="vocab">
+      <div class="tag">Key vocabulary</div>
+      <div class="vlist">
+        <div class="vterm"><b>Evaluation suite</b><span>A collection of metrics applied to the same test case, returning one consolidated report.</span></div>
+        <div class="vterm"><b>Test harness</b><span>The runner that invokes the agent, captures outputs, and feeds them into the evaluators.</span></div>
+        <div class="vterm"><b>Retrieved context</b><span>The combined snippets + facts from the agent's state, passed into the judge as ground truth.</span></div>
+        <div class="vterm"><b>Aggregated report</b><span>The single dict returned from <code>run_agent_evaluations</code> containing every metric's score, pass flag, and reason.</span></div>
+      </div>
+    </div>
+
+    <p class="lead">Four modules, one pipeline. The harness runs the real LangGraph, three evaluator modules grade the output along independent axes, the report ties it together.</p>
+
+    <div class="three-col">
+      <div class="card accent" style="border-left-color:var(--c-bleu)">
+        <div class="label" style="color:var(--c-bleu); margin-bottom:10px">lexical_code.py</div>
+        <h4>Lexical & alignment</h4>
+        <p class="prose" style="font-size:14.5px"><b>BLEU</b> (precision-over-n-grams, with smoothing) and <b>ROUGE-L</b> (recall via longest common subsequence, with stemming) — both as custom <code>BaseMetric</code> subclasses. Plus a <b>G-Eval lexical alignment</b> judge for semantic match against the expected output, and a <b>G-Eval code correctness</b> check for any code blocks in the answer.</p>
+      </div>
+      <div class="card accent" style="border-left-color:var(--c-halluc)">
+        <div class="label" style="color:var(--c-halluc); margin-bottom:10px">hallucination.py</div>
+        <h4>Hallucination & faithfulness</h4>
+        <p class="prose" style="font-size:14.5px">Native DeepEval <b>HallucinationMetric</b> (max threshold, scores contradictions against context) and <b>FaithfulnessMetric</b> (min threshold, scores whether every claim is grounded in retrieval context). Both return numeric scores plus natural-language reasons — so the report shows <em>why</em> a claim was flagged.</p>
+      </div>
+      <div class="card accent" style="border-left-color:var(--c-eu)">
+        <div class="label" style="color:var(--c-eu); margin-bottom:10px">compliance.py</div>
+        <h4>EU AI Act + DPDP audit</h4>
+        <p class="prose" style="font-size:14.5px">Two <b>G-Eval</b> graders with hand-written regulatory criteria. The EU AI Act grader flags prohibited practices (subliminal manipulation, social scoring, biometric profiling, workplace emotion recognition). The DPDP grader audits for unredacted Aadhaar, PAN, voter ID, passport numbers, and raw Indian phone numbers in the output.</p>
+      </div>
+    </div>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-top:56px; margin-bottom:12px">The harness — <code>test_agent_evaluation.py</code>.</h3>
+    <p class="prose">The runner ties everything to your real graph. No mocked outputs, no theatrical scoring. Three honest steps per test question.</p>
+
+    <ol style="list-style:none; counter-reset:hstep; max-width:880px; margin-top:16px">
+      <li style="counter-increment:hstep; position:relative; padding-left:48px; margin-bottom:18px;">
+        <span style="position:absolute; left:0; top:-4px; font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:32px; color:var(--s8);">1.</span>
+        <div class="prose" style="margin:0"><b>Run the real LangGraph.</b> <code>compile_graph</code> builds the Searcher → Reader → Writer → Critic team. <code>graph.invoke</code> executes it end-to-end against the live question, returning a final state with <code>answer</code>, <code>sources</code>, <code>facts</code>, <code>iterations</code>, and <code>llm_calls</code>.</div>
+      </li>
+      <li style="counter-increment:hstep; position:relative; padding-left:48px; margin-bottom:18px;">
+        <span style="position:absolute; left:0; top:-4px; font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:32px; color:var(--s8);">2.</span>
+        <div class="prose" style="margin:0"><b>Build retrieved_contexts from agent state.</b> Source snippets and extracted facts are concatenated into one list. This is the ground truth handed to Hallucination and Faithfulness. If the agent retrieved nothing, the answer itself is used as a fallback so the judge never gets <code>None</code>.</div>
+      </li>
+      <li style="counter-increment:hstep; position:relative; padding-left:48px; margin-bottom:18px;">
+        <span style="position:absolute; left:0; top:-4px; font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:32px; color:var(--s8);">3.</span>
+        <div class="prose" style="margin:0"><b>Run the DeepEval suite.</b> <code>run_agent_evaluations</code> calls every evaluator module, collects scores, pass flags, and reasons, and returns one report. The terminal prints a verification card per metric, plus a final <b>ALL GATES PASSED</b> verdict.</div>
+      </li>
+    </ol>
+
+    <h3 class="serif" style="font-size:24px; font-weight:700; margin-top:56px; margin-bottom:12px">The full metric ledger.</h3>
+    <table class="dtable">
+      <thead><tr><th>Metric</th><th>Module</th><th>Direction</th><th>Threshold</th><th>What it scores</th></tr></thead>
+      <tbody>
+        <tr><td class="k" style="color:var(--c-bleu)">BLEU</td><td>lexical_code</td><td>higher = better</td><td>≥ 0.30</td><td>n-gram precision vs expected output, with smoothing</td></tr>
+        <tr><td class="k" style="color:var(--c-rouge)">ROUGE-L</td><td>lexical_code</td><td>higher = better</td><td>≥ 0.50</td><td>longest common subsequence recall, with stemming</td></tr>
+        <tr><td class="k" style="color:var(--c-bleu)">Lexical Alignment</td><td>lexical_code</td><td>higher = better</td><td>≥ 0.60</td><td>G-Eval semantic match between output and expected</td></tr>
+        <tr><td class="k" style="color:var(--c-bleu)">Code Correctness</td><td>lexical_code</td><td>higher = better</td><td>≥ 0.70</td><td>G-Eval audit of any code blocks in the output</td></tr>
+        <tr><td class="k" style="color:var(--c-halluc)">Hallucination</td><td>hallucination</td><td>lower = better</td><td>≤ 0.30</td><td>fraction of contexts contradicted by output</td></tr>
+        <tr><td class="k" style="color:var(--c-faith)">Faithfulness</td><td>hallucination</td><td>higher = better</td><td>≥ 0.60</td><td>fraction of claims supported by retrieval context</td></tr>
+        <tr><td class="k" style="color:var(--c-eu)">EU AI Act</td><td>compliance</td><td>higher = better</td><td>≥ 0.80</td><td>G-Eval audit for prohibited AI practices</td></tr>
+        <tr><td class="k" style="color:var(--c-dpdp)">DPDP</td><td>compliance</td><td>higher = better</td><td>≥ 0.90</td><td>G-Eval audit for unredacted PII in the output</td></tr>
+      </tbody>
+    </table>
+
+    <div class="notes" style="margin-top:32px">
+      <div class="note g"><span class="key">EIGHT METRICS, FOUR AXES, ONE REPORT</span>Lexical alignment, factual groundedness, regulatory compliance, code correctness — four independent failure modes, each measured with the right tool. The suite returns a single consolidated report so every test question prints one verification card with eight gates. <b>ALL GATES PASSED</b> means the agent's output cleared the lexical, semantic, factual, <i>and</i> compliance bar — not just one of them.</div>
+      <div class="note a"><span class="key">REAL GRAPH, REAL SCORES</span>This is not synthetic data. The harness invokes your compiled LangGraph, captures actual web snippets and extracted facts, and runs the judge LLM against the real answer. The output you grade is the output a user would see.</div>
+    </div>
+
+    <div class="summary">
+      <div class="stag">Section summary</div>
+      <p>The suite is <b>three evaluator modules and one harness</b>. <code>lexical_code.py</code> covers wording and code; <code>hallucination.py</code> covers groundedness; <code>compliance.py</code> covers regulation. <code>test_agent_evaluation.py</code> runs the real LangGraph against each test question, feeds the output and context into every evaluator, and prints a consolidated report. Eight metrics, four axes, one verdict.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FINAL SUMMARY ===== -->
+<section class="stage" style="--stage-color: var(--s1); border-top:2px solid var(--card-border)">
+  <div class="container">
+    <div class="stage-header">
+      <div class="stage-num-big" style="background:linear-gradient(180deg,var(--c-bleu),var(--c-passk),var(--c-faith),var(--c-dpdp));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">∞</div>
+      <div>
+        <h2 class="stage-title">Six ideas to keep.</h2>
+        <p class="stage-kicker">If your students remember nothing else, make sure they remember these.</p>
+      </div>
+    </div>
+
+    <div class="kt-grid">
+      <div class="kt-card" style="border-top-color:var(--c-bleu)">
+        <div class="kt-n" style="color:var(--c-bleu)">01</div>
+        <div class="kt-h">Lexical metrics see words, not meaning.</div>
+        <div class="kt-d">BLEU and ROUGE punish paraphrase. A correct answer in different words scores low. They're necessary for translation and structured output, never sufficient for free-form agent prose. Always pair with semantic metrics.</div>
+      </div>
+      <div class="kt-card" style="border-top-color:var(--c-passk)">
+        <div class="kt-n" style="color:var(--c-passk)">02</div>
+        <div class="kt-h">Pass@k measures one thing well.</div>
+        <div class="kt-d">Parallel attempts against a hard verifier. It fits your multi-query RAG node perfectly; it does <i>not</i> fit your sequential Writer-Critic loop. The gap between pass@1 and pass@k is the architectural justification for query expansion.</div>
+      </div>
+      <div class="kt-card" style="border-top-color:var(--c-halluc)">
+        <div class="kt-n" style="color:var(--c-halluc)">03</div>
+        <div class="kt-h">Hallucination catches lies. Faithfulness catches sneaking in.</div>
+        <div class="kt-d">Contradictions vs unsupported additions. Both are LLM-judged, both decompose the answer into claims, both measure consistency <i>with sources</i>, not with reality. Faithfulness is the load-bearing metric for a RAG agent.</div>
+      </div>
+      <div class="kt-card" style="border-top-color:var(--c-eu)">
+        <div class="kt-n" style="color:var(--c-eu)">04</div>
+        <div class="kt-h">Risk is a property of the use case.</div>
+        <div class="kt-d">The EU AI Act doesn't regulate models — it regulates deployments. Same LLM is minimal-risk as a grammar checker and high-risk as a resume screener. DPDP layers PII protection on top. Both reach beyond their borders.</div>
+      </div>
+      <div class="kt-card" style="border-top-color:var(--c-guard)">
+        <div class="kt-n" style="color:var(--c-guard)">05</div>
+        <div class="kt-h">Audit is not airbag.</div>
+        <div class="kt-d">Compliance lives in three layers: system prompt (preventive, inside), guardrails (preventive, around), evaluation (detective, after). Your <code>compliance.py</code> is the third. It detects violations; it does not stop them. Production needs all three.</div>
+      </div>
+      <div class="kt-card" style="border-top-color:var(--c-deepeval)">
+        <div class="kt-n" style="color:var(--c-deepeval)">06</div>
+        <div class="kt-h">DeepEval + LangSmith = the real stack.</div>
+        <div class="kt-d">DeepEval grades quality (faithfulness, hallucination, compliance, tool correctness) via LLM-as-judge. LangSmith captures operations (latency, tokens, cost). One framework alone is half a picture. Together they're what shipping teams use.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="container">
+    <p class="quote">"Fluent and wrong is the dangerous answer.<br>The point of evaluation is to tell them apart — <em>before</em> the user does."</p>
+    <div class="sig">Evaluating agents · A practitioner's field guide · For BIA students</div>
+  </div>
+</footer>
+
+</body>
+</html>

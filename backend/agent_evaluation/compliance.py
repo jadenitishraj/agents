@@ -4,7 +4,7 @@ Audits agent responses against regulatory compliance frameworks (EU AI Act & Ind
 using DeepEval's plain-English G-Eval metrics.
 """
 
-from deepeval.metrics import GEval
+from deepeval.metrics import GEval #this is LLM as judge
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 
 def evaluate_regulatory_compliance(
