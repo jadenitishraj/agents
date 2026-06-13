@@ -63,11 +63,21 @@ Answer:"""
         return False
 
 
+def is_notion(question: str) -> bool:
+    """Check if the question specifically asks to query Notion."""
+    q_lower = question.lower()
+    return "notion" in q_lower
+
+
 def select_team(question: str) -> list[str]:
     """Select the active team of agents for this question.
 
-    Priority: arithmetic → simple/greeting → full research team.
+    Priority: notion → arithmetic → simple/greeting → full research team.
     """
+    if is_notion(question):
+        # Notion queries go directly to Writer (which uses MCP tools) → Critic.
+        return ["Writer", "Critic"]
+
     if is_arithmetic(question):
         # Arithmetic goes directly to Writer (with MCP tools) → Critic.
         return ["Writer", "Critic"]

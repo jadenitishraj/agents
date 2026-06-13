@@ -22,14 +22,15 @@ def critic_agent(
 ) -> tuple[bool, list[str]]:
     """Review the answer and return (approved, issues)."""
     
-    from backend.config.team_selector import is_simple_question
+    from backend.config.team_selector import is_simple_question, is_arithmetic, is_notion
     
+    if is_simple_question(question) or is_arithmetic(question) or is_notion(question):
+        # Simple, arithmetic, and Notion queries are auto-approved.
+        return True, []
+        
     issues: list[str] = []
     
-    if is_simple_question(question):
-        # Simple questions don't require external sources or long answers.
-        pass
-    elif internal_contexts and len(internal_contexts) > 0:
+    if internal_contexts and len(internal_contexts) > 0:
         # If we have internal chunks, we bypass rejection rules and trust the RAG context.
         return True, []
     else:

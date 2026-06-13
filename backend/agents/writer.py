@@ -55,7 +55,7 @@ def writer_agent(
     tool_instructions = ""
     if tools:
         tool_names = [t.name for t in tools]
-        tool_instructions = f"\n\nYou have access to the following tools: {', '.join(tool_names)}.\nYou MUST dynamically select and use these tools to fulfill the user's request (e.g. use mathematical tools for any arithmetic computations instead of calculating it yourself)."
+        tool_instructions = f"\n\nYou have access to the following tools: {', '.join(tool_names)}.\nYou MUST dynamically select and use these tools to fulfill the user's request.\nFor mathematical computations, use the math tools.\nIf the user asks about Notion, quotes, or their personal workspace (including questions like 'what can you see', 'what pages do I have', or 'do you have access'), you MUST call the 'search_notion' tool first. Do NOT state that you cannot access Notion or refuse the request without first executing the 'search_notion' tool."
 
     prompt = f"""{policy}
 
@@ -82,9 +82,24 @@ Sources:
     messages.append(response)
     
     if response.tool_calls:
-        tool_node = ToolNode(tools)
-        tool_result = tool_node.invoke({"messages": messages})
-        messages.extend(tool_result["messages"])
+        from langchain_core.messages import ToolMessage
+        for tool_call in response.tool_calls:
+            tool_name = tool_call["name"]
+            tool_args = tool_call["args"]
+            tool_id = tool_call["id"]
+            
+            # Find the matching tool object
+            tool_obj = next((t for t in tools if t.name == tool_name), None)
+            if tool_obj:
+                print(f"  [WRITER] Manually invoking tool {tool_name} with args {tool_args}...")
+                try:
+                    tool_output = tool_obj.invoke(tool_args)
+                except Exception as e:
+                    tool_output = f"Error executing tool: {str(e)}"
+                
+                messages.append(ToolMessage(content=str(tool_output), tool_call_id=tool_id, name=tool_name))
+            else:
+                messages.append(ToolMessage(content=f"Error: Tool '{tool_name}' not found in registry.", tool_call_id=tool_id, name=tool_name))
         
         # Ask for final answer after tools
         messages.append(HumanMessage(content="State the final answer in a clear sentence."))

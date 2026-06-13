@@ -6,6 +6,7 @@ Agents receive tools from here, never import them directly.
 from backend.tools.search import search_web
 from backend.rag_v2.retriever import search_global_db
 from backend.mcp.client import mcp_add, mcp_subtract, mcp_multiply, mcp_divide
+from backend.mcp.notion_client import search_notion
 
 TOOL_REGISTRY = {
     "web_search": search_web,
@@ -14,4 +15,5 @@ TOOL_REGISTRY = {
     "mcp_subtract": mcp_subtract,
     "mcp_multiply": mcp_multiply,
     "mcp_divide": mcp_divide,
+    "notion_search": search_notion,
 }
