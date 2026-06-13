@@ -39,6 +39,6 @@ def search_rag(query: str, top_k: int = 3) -> dict:
     """
     configure_settings()
     
-    # Simple direct call to the retriever
-    results = search_global_db(query, top_k=top_k)
+    # Simple direct call to the retriever using invoke
+    results = search_global_db.invoke({"query": query, "top_k": top_k})
     return results

@@ -6,6 +6,7 @@ Pipeline:  rephrase  →  multi-query  →  HyDE  →  vector+BM25  →  RRF+ded
 """
 
 import json
+from langchain_core.tools import tool
 from llama_index.core import VectorStoreIndex
 from llama_index.core.indices.query.query_transform import HyDEQueryTransform
 from llama_index.core.indices.query.schema import QueryBundle
@@ -18,7 +19,8 @@ from .indexer import GLOBAL_STORAGE_DIR, get_global_storage
 from .llm import get_llama_embed_model, get_llama_llm
 
 
-def search_global_db(query: str, top_k: int = 3, num_variants: int = 5) -> dict:
+@tool
+def search_global_db(query: str, top_k: int = 3, num_variants: int = 5) -> str:
     print(f"\n=== Searching global database for: '{query}' ===")
     llm = get_llama_llm()
     storage = get_global_storage()
@@ -72,9 +74,9 @@ def search_global_db(query: str, top_k: int = 3, num_variants: int = 5) -> dict:
          "source": n.node.metadata.get("source_file", "Unknown")}
         for n in best
     ]
-    return {
-        "query": query,
-        "rephrased_query": rephrased,
-        "results": results,
-        "joined_text": "\n".join(r["text"] for r in results),
-    }
+    
+    if not results:
+        return "No relevant information found in the internal database."
+        
+    content = "\n\n---\n\n".join([f"Source: {r['source']}\n{r['text']}" for r in results])
+    return content

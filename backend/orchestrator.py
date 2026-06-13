@@ -114,7 +114,8 @@ from backend.agents.internal_search import internal_search_agent
 def internal_search_node(state: State) -> dict:
     """Run the Internal Search agent to extract facts from the global DB."""
     print("  InternalSearcher -> searching global database...")
-    result = internal_search_agent(state["question"])
+    tools = [TOOL_REGISTRY["web_search"], TOOL_REGISTRY["global_db_search"]]
+    result = internal_search_agent(state["question"], tools=tools)
     print(f"    {len(result.get('facts', []))} facts extracted from {len(result.get('contexts', []))} contexts")
     return {
         "internal_facts": result.get("facts", []),

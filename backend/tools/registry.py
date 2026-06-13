@@ -1,5 +1,5 @@
 from backend.tools.search import search_web
-from backend.tools.rag_retriever import search_global_db
+from backend.rag_v2.retriever import search_global_db
 
 TOOL_REGISTRY = {
     "web_search": search_web,
