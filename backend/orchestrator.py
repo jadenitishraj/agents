@@ -124,6 +124,8 @@ def internal_search_node(state: State) -> dict:
         "llm_calls": state.get("llm_calls", 0) + 1,
     }
 
+
+
 def reader_node(state: State) -> dict:
     """Run the Reader agent to extract facts."""
     print("  Reader -> extracting facts...")
@@ -153,7 +155,11 @@ def compliance_node(state: State) -> dict:
 
 
 def writer_node(state: State) -> dict:
-    """Run the Writer agent with Reflexion-aware feedback."""
+    """Run the Writer agent with Reflexion-aware feedback.
+
+    The Writer has access to all tools in the registry and can dynamically
+    invoke them to fulfill the user's request if needed.
+    """
     print("  Writer -> synthesizing answer...")
 
     # Build feedback from episodic memory (Reflexion) if available.
@@ -166,6 +172,9 @@ def writer_node(state: State) -> dict:
     else:
         feedback = state.get("critic_feedback", "")
 
+    # Pass ALL tools from the registry to the Writer.
+    tools = list(TOOL_REGISTRY.values())
+
     answer = writer_agent(
         state["question"],
         state.get("sources", []),
@@ -174,6 +183,7 @@ def writer_node(state: State) -> dict:
         internal_contexts=state.get("internal_contexts", []),
         disclaimer=state.get("disclaimer", ""),
         critic_feedback=feedback,
+        tools=tools,
     )
     iteration = state.get("iterations", 0) + 1
     print(f"    Draft ready ({len(answer.split())} words) — iteration {iteration}")

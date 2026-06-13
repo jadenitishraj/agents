@@ -12,6 +12,11 @@ from backend.content_policy.policy_loader import load_policy, wrap_user_input
 
 Source = dict[str, str]
 
+from langchain_core.tools import BaseTool
+from langchain_core.messages import HumanMessage
+from langgraph.prebuilt import ToolNode
+from backend.llm import get_llm
+
 @traceable(name="writer_agent", run_type="chain")
 def writer_agent(
     question: str,
@@ -21,6 +26,7 @@ def writer_agent(
     internal_contexts: list[str] = None,
     disclaimer: str = "",
     critic_feedback: str = "",
+    tools: list[BaseTool] = None,
 ) -> str:
     """Write a clear, well-structured answer (150-300 words) to the question."""
     policy = load_policy()
@@ -45,11 +51,16 @@ def writer_agent(
     chunks_text = ""
     if internal_contexts and len(internal_contexts) > 0:
         chunks_text = "\n\nRAG Contexts:\n" + "\n\n".join(f"[Chunk {i+1}] {c}" for i, c in enumerate(internal_contexts))
+        
+    tool_instructions = ""
+    if tools:
+        tool_names = [t.name for t in tools]
+        tool_instructions = f"\n\nYou have access to the following tools: {', '.join(tool_names)}.\nYou MUST dynamically select and use these tools to fulfill the user's request (e.g. use mathematical tools for any arithmetic computations instead of calculating it yourself)."
 
     prompt = f"""{policy}
 
 Write a clear, well-structured answer (150-300 words) to the question.
-Use the facts, contexts, and cite sources where appropriate.
+Use the facts, contexts, and cite sources where appropriate.{tool_instructions}
 {disclaimer_line}
 
 Question: {wrap_user_input(question)}
@@ -59,7 +70,28 @@ Facts:
 
 Sources:
 {wrap_user_input(sources_text)}{chunks_text}{feedback_text}"""
-    return call_llm(prompt, max_tokens=600, agent_name="Writer")
+    
+    if not tools:
+        return call_llm(prompt, max_tokens=600, agent_name="Writer")
+        
+    llm = get_llm(agent_name="Writer")
+    llm_with_tools = llm.bind_tools(tools)
+    
+    messages = [HumanMessage(content=prompt)]
+    response = llm_with_tools.invoke(messages)
+    messages.append(response)
+    
+    if response.tool_calls:
+        tool_node = ToolNode(tools)
+        tool_result = tool_node.invoke({"messages": messages})
+        messages.extend(tool_result["messages"])
+        
+        # Ask for final answer after tools
+        messages.append(HumanMessage(content="State the final answer in a clear sentence."))
+        final_response = llm.invoke(messages)
+        return final_response.content
+        
+    return response.content or ""
     # Teaching note:
     # This project builds the writer prompt as one explicit string so students can
     # see the full prompt contract in a single place. LangGraph does not require

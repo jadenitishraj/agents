@@ -22,16 +22,25 @@ def is_sensitive(question: str) -> bool:
     return any(kw in lowered for kw in SENSITIVE_KEYWORDS)
 
 
-def is_simple_question(question: str) -> bool:
-    """Return True if the question is a simple greeting, basic arithmetic, or general conversational query."""
-    lowered = question.strip().lower()
-    
-    # 1. Regex check for basic math expressions
+def is_arithmetic(question: str) -> bool:
+    """Return True if the question involves arithmetic computation."""
     import re
-    if re.match(r'^[\d\s+\-*/()]+$', lowered):
+    lowered = question.strip().lower()
+    # Pure math expression: "1+1", "2 * 3", "10 / 5"
+    if re.search(r'\d+\s*[+\-*/]\s*\d+', lowered):
         return True
-        
-    # 2. Heuristic check for common greetings/simple queries
+    # Math keywords with numbers: "add 2 and 3", "sum of 5 and 10"
+    math_kw = ["calculate", "compute", "sum of", "product of", "divide", "multiply", "add", "subtract"]
+    if any(kw in lowered for kw in math_kw) and re.search(r'\d', lowered):
+        return True
+    return False
+
+
+def is_simple_question(question: str) -> bool:
+    """Return True if the question is a simple greeting or general conversational query."""
+    lowered = question.strip().lower()
+
+    # Greetings / trivial phrases
     simple_phrases = {
         "hi", "hello", "hey", "how are you", "how are you?", "what's up?", "whats up?",
         "hi there", "good morning", "good afternoon", "good evening", "how's it going",
@@ -39,8 +48,8 @@ def is_simple_question(question: str) -> bool:
     }
     if lowered in simple_phrases:
         return True
-        
-    # 3. Fallback to a lightweight LLM call to classify
+
+    # Fallback to a lightweight LLM call to classify
     try:
         from backend.llm import call_llm
         prompt = f"""Classify if the following question/statement is extremely simple and does NOT need any external web search or internal database lookup (e.g. greetings, basic arithmetic, simple conversational query, etc.).
@@ -57,9 +66,12 @@ Answer:"""
 def select_team(question: str) -> list[str]:
     """Select the active team of agents for this question.
 
-    Always-on roles are included unconditionally unless the question is simple.
-    Optional roles are added based on question analysis.
+    Priority: arithmetic → simple/greeting → full research team.
     """
+    if is_arithmetic(question):
+        # Arithmetic goes directly to Writer (with MCP tools) → Critic.
+        return ["Writer", "Critic"]
+
     if is_simple_question(question):
         # Simple/conversational questions go directly to Writer and Critic.
         return ["Writer", "Critic"]
@@ -73,3 +85,4 @@ def select_team(question: str) -> list[str]:
         team.append("Compliance")
 
     return team
+
