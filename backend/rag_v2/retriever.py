@@ -21,6 +21,7 @@ from .llm import get_llama_embed_model, get_llama_llm
 
 @tool
 def search_global_db(query: str, top_k: int = 3, num_variants: int = 5) -> str:
+    """Search the internal global RAG database using hybrid vector and BM25 search with LLM reranking."""
     print(f"\n=== Searching global database for: '{query}' ===")
     llm = get_llama_llm()
     storage = get_global_storage()
@@ -41,7 +42,7 @@ def search_global_db(query: str, top_k: int = 3, num_variants: int = 5) -> str:
 
     raw_chunks = json.loads((GLOBAL_STORAGE_DIR / "bm25_index.json").read_text("utf-8"))
     if not raw_chunks:
-        return {"error": "Global database is empty."}
+        return "Error: Global database is empty."
     nodes = [TextNode(id_=c["id"], text=c["text"], metadata=c["metadata"]) for c in raw_chunks]
     bm25_retriever = BM25Retriever.from_defaults(nodes=nodes, similarity_top_k=top_k * 2)
     print(f"  → Loaded {len(raw_chunks)} chunks")

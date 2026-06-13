@@ -23,7 +23,7 @@ def searcher_agent(queries: list[str]) -> list[Source]:
     seen_urls: set[str] = set()
 
     for query in queries:
-        results = search_web(query)
+        results = search_web.invoke(query)
         for result in results:
             url = result.get("link", "")
             if url and url not in seen_urls:

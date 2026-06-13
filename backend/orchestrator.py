@@ -110,6 +110,7 @@ def searcher_node(state: State) -> dict:
 
 
 from backend.agents.internal_search import internal_search_agent
+from backend.tools.registry import TOOL_REGISTRY
 
 def internal_search_node(state: State) -> dict:
     """Run the Internal Search agent to extract facts from the global DB."""
