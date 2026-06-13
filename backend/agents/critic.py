@@ -22,18 +22,23 @@ def critic_agent(
 ) -> tuple[bool, list[str]]:
     """Review the answer and return (approved, issues)."""
     
-    if internal_contexts and len(internal_contexts) > 0:
+    from backend.config.team_selector import is_simple_question
+    
+    issues: list[str] = []
+    
+    if is_simple_question(question):
+        # Simple questions don't require external sources or long answers.
+        pass
+    elif internal_contexts and len(internal_contexts) > 0:
         # If we have internal chunks, we bypass rejection rules and trust the RAG context.
         return True, []
-        
-    issues: list[str] = []
+    else:
+        if len(sources) < 3:
+            issues.append(f"Too few sources ({len(sources)} found, need at least 3)")
 
-    if len(sources) < 3:
-        issues.append(f"Too few sources ({len(sources)} found, need at least 3)")
-
-    word_count = len(answer.split())
-    if word_count < 100:
-        issues.append(f"Answer too brief ({word_count} words, need at least 100)")
+        word_count = len(answer.split())
+        if word_count < 100:
+            issues.append(f"Answer too brief ({word_count} words, need at least 100)")
 
     prompt = f"""Does this answer fully address the question?
 Reply with EXACTLY one of:
